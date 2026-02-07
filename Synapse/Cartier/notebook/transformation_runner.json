@@ -1,0 +1,252 @@
+{
+	"name": "transformation_runner",
+	"properties": {
+		"folder": {
+			"name": "transformation/runners"
+		},
+		"nbformat": 4,
+		"nbformat_minor": 2,
+		"bigDataPool": {
+			"referenceName": "devpoolv34",
+			"type": "BigDataPoolReference"
+		},
+		"sessionProperties": {
+			"driverMemory": "112g",
+			"driverCores": 16,
+			"executorMemory": "112g",
+			"executorCores": 16,
+			"numExecutors": 2,
+			"conf": {
+				"spark.dynamicAllocation.enabled": "false",
+				"spark.dynamicAllocation.minExecutors": "2",
+				"spark.dynamicAllocation.maxExecutors": "2",
+				"spark.autotune.trackingId": "63482fbf-802a-4703-b767-3a1fe7826733"
+			}
+		},
+		"metadata": {
+			"saveOutput": true,
+			"enableDebugMode": true,
+			"kernelspec": {
+				"name": "synapse_pyspark",
+				"display_name": "Synapse PySpark"
+			},
+			"language_info": {
+				"name": "python"
+			},
+			"a365ComputeOptions": {
+				"id": "/subscriptions/f8a339ea-4445-4d69-a4bb-b7c77c9db241/resourceGroups/RG-Cartier-Dev/providers/Microsoft.Synapse/workspaces/synw-time-cartier-dev/bigDataPools/devpool",
+				"name": "devpoolv34",
+				"type": "Spark",
+				"endpoint": "https://synw-time-cartier-dev.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/devpool",
+				"auth": {
+					"type": "AAD",
+					"authResource": "https://dev.azuresynapse.net"
+				},
+				"sparkVersion": "3.3",
+				"nodeCount": 10,
+				"cores": 16,
+				"memory": 112,
+				"automaticScaleJobs": false
+			},
+			"sessionKeepAliveTimeout": 30
+		},
+		"cells": [
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					},
+					"tags": [
+						"parameters"
+					]
+				},
+				"source": [
+					"data_type = \"\"\r\n",
+					"run_id = \"\"\r\n",
+					"run_execution_time = \"\""
+				],
+				"execution_count": 1
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"# # Un-Comment for local run as parameters are passed via ADF Pipeline\r\n",
+					"\r\n",
+					"# import uuid\r\n",
+					"# from datetime import datetime, timezone\r\n",
+					"\r\n",
+					"# data_type = \"\"\r\n",
+					"# run_id = str(uuid.uuid4())\r\n",
+					"# run_execution_time =  datetime.now(timezone.utc).strftime(\"%Y-%m-%dT%H:%M:%S.%fZ\")\r\n",
+					"\r\n",
+					"params = { \"data_type\": data_type, \"run_id\": run_id, \"run_execution_time\": run_execution_time}"
+				],
+				"execution_count": 2
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"%run runners/runners_base_setup"
+				],
+				"execution_count": 3
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"%run validation/validation_engine"
+				],
+				"execution_count": 4
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"%run config/data_configs"
+				],
+				"execution_count": 5
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"%run helpers/helper_data_configs"
+				],
+				"execution_count": 6
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"%run transformation/utilities/transformation_helper"
+				],
+				"execution_count": 7
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"%run transformation/logics/transformation_logic"
+				],
+				"execution_count": 8
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"collapsed": false
+				},
+				"source": [
+					"datalake_client = container.datalake_client()\r\n",
+					"telemetry_client = container.telemetry_client(run_id, f\"{data_type}-transformation\", run_execution_time)\r\n",
+					"validation_engine = ValidationEngine(telemetry_client, params, datalake_client)\r\n",
+					"data_type_with_underscore = data_type.replace(\"-\", \"_\")\r\n",
+					"data_configs_helper = DataConfigsHelper(DataConfigs, f\"{data_type_with_underscore}_config\")\r\n",
+					"transformation_helper = TransformationHelper(\r\n",
+					"    schema_transformer, \r\n",
+					"    datalake_client, \r\n",
+					"    table_service_client,\r\n",
+					"    telemetry_client,\r\n",
+					"    validation_engine,\r\n",
+					"    data_configs_helper,\r\n",
+					"    spark_session,\r\n",
+					"    params)\r\n",
+					"ms_spark_utils = MsSparkUtils()\r\n",
+					" \r\n",
+					"transformation_engine = TransformationLogicEngine(\r\n",
+					"    spark_session, \r\n",
+					"    data_configs_helper, \r\n",
+					"    datalake_client, \r\n",
+					"    transformation_helper, \r\n",
+					"    table_service_client, \r\n",
+					"    telemetry_client,\r\n",
+					"    ms_spark_utils,\r\n",
+					"    params)\r\n",
+					"    \r\n",
+					"transform_result = transformation_engine.execute()\r\n",
+					"\r\n",
+					"# spark_session.stop()"
+				],
+				"execution_count": 9
+			}
+		]
+	}
+}

@@ -1,0 +1,34 @@
+{
+	"name": "WfsSftp",
+	"properties": {
+		"annotations": [],
+		"type": "Sftp",
+		"typeProperties": {
+			"host": "interface.us.wfs.cloud",
+			"port": 22,
+			"skipHostKeyValidation": true,
+			"authenticationType": "SshPublicKey",
+			"userName": "msftdatalakedevftp",
+			"privateKeyContent": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "CartierKeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "WFSSftpDatalakeSSHKey"
+			},
+			"passPhrase": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "CartierKeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "WFSSftpDatalakeOpenSSHKey-Passphrase"
+			}
+		},
+		"connectVia": {
+			"referenceName": "AutoResolveIntegrationRuntime",
+			"type": "IntegrationRuntimeReference"
+		}
+	}
+}

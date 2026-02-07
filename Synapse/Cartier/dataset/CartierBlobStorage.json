@@ -1,0 +1,42 @@
+{
+	"name": "CartierBlobStorage",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "CartierBlobStorage",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"Directory": {
+				"type": "string"
+			},
+			"BlobName": {
+				"type": "string"
+			},
+			"Container": {
+				"type": "string",
+				"defaultValue": "cartier"
+			}
+		},
+		"annotations": [],
+		"type": "Parquet",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobStorageLocation",
+				"fileName": {
+					"value": "@dataset().BlobName",
+					"type": "Expression"
+				},
+				"folderPath": {
+					"value": "@dataset().Directory",
+					"type": "Expression"
+				},
+				"container": {
+					"value": "@dataset().Container",
+					"type": "Expression"
+				}
+			},
+			"compressionCodec": "snappy"
+		},
+		"schema": []
+	}
+}

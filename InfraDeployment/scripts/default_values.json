@@ -1,0 +1,186 @@
+{
+    "ApiDataLocation": [
+        {
+            "PartitionKey": "calculated-time",
+            "RowKey": "Bronze_Full_Default"
+        },
+        {
+            "PartitionKey": "calculated-time",
+            "RowKey": "Gold_Delta_ABS"
+        },
+        {
+            "PartitionKey": "calculated-time",
+            "RowKey": "Gold_Delta_ABS-secured"
+        },
+        {
+            "PartitionKey": "calculated-time",
+            "RowKey": "Gold_Delta_ATT"
+        },
+        {
+            "PartitionKey": "calculated-time",
+            "RowKey": "Gold_Full_ABS"
+        },
+        {
+            "PartitionKey": "calculated-time",
+            "RowKey": "Gold_Full_ABS-secured"
+        },
+        {
+            "PartitionKey": "calculated-time",
+            "RowKey": "Gold_Full_ATT"
+        },
+        {
+            "PartitionKey": "calculated-time",
+            "RowKey": "Silver_Delta_ABS",
+            "GoldIndex": 0
+        },
+        {
+            "PartitionKey": "calculated-time",
+            "RowKey": "Silver_Delta_ATT",
+            "GoldIndex": 0
+        },
+        {
+            "PartitionKey": "calculated-time",
+            "RowKey": "Silver_Full_ABS",
+            "GoldIndex": 0
+        },
+        {
+            "PartitionKey": "calculated-time",
+            "RowKey": "Silver_Full_ATT",
+            "GoldIndex": 0
+        },
+        {
+            "PartitionKey": "calculated-time",
+            "RowKey": "Silver_Temp_Parquet",
+            "GoldIndex": 0
+        },
+        {
+            "PartitionKey": "shift",
+            "RowKey": "Bronze_Full_Default"
+        },
+        {
+            "PartitionKey": "shift",
+            "RowKey": "Gold_Delta_Default"
+        },
+        {
+            "PartitionKey": "shift",
+            "RowKey": "Gold_Full_Default"
+        },
+        {
+            "PartitionKey": "shift",
+            "RowKey": "Silver_Delta_Default",
+            "GoldIndex": 0
+        },
+        {
+            "PartitionKey": "shift",
+            "RowKey": "Silver_Full_Default",
+            "GoldIndex": 0
+        },
+        {
+            "PartitionKey": "shift",
+            "RowKey": "Silver_Temp_Parquet",
+            "GoldIndex": 0
+        }
+    ],
+    "ApiMetaData": [
+        {
+            "PartitionKey": "calculated-time",
+            "RowKey": "calculated-time",
+            "Enabled": "true",
+            "BronzeIndex": 0,
+            "Method": "GET",
+            "RecordCountToRequest": 10000,
+            "Version": "v1",
+            "NextCursor": "",
+            "NextIngestionCursor": ""
+        },
+        {
+            "PartitionKey": "shift",
+            "RowKey": "shift",
+            "Enabled": "true",
+            "BronzeIndex": 0,
+            "Method": "GET",
+            "RecordCountToRequest": 10000,
+            "Version": "v1",
+            "NextCursor": "",
+            "NextIngestionCursor": ""
+        }
+    ],
+    "HRDLFilePublishDetails": [
+        {
+            "PartitionKey": "TR01ShiftRecords",
+            "RowKey": "Delta",
+            "IsPublished": "false"
+        },
+        {
+            "PartitionKey": "TR01ShiftRecords",
+            "RowKey": "Full",
+            "IsPublished": "false",
+            "LastProcessedRecordCount": 0,
+            "DeviationPercentage": 0            
+        },
+        {
+            "PartitionKey": "TR01TimeBalancesMeta",
+            "RowKey": "Metadata",
+            "IsPublished": "false",
+            "LastProcessedRecordCount": 0,
+            "DeviationPercentage": 0
+        },
+        {
+            "PartitionKey": "TR01TimeMeta",
+            "RowKey": "Metadata",
+            "IsPublished": "false",
+            "LastProcessedRecordCount": 0,
+            "DeviationPercentage": 0
+        },
+        {
+            "PartitionKey": "TR01TimeOffBalances",
+            "RowKey": "Metadata",
+            "IsPublished": "false",
+            "LastProcessedRecordCount": 0,
+            "DeviationPercentage": 10
+        },
+        {
+            "PartitionKey": "TR01TimeOffMeta",
+            "RowKey": "Metadata",
+            "IsPublished": "false",
+            "LastProcessedRecordCount": 0,
+            "DeviationPercentage": 0
+        },
+        {
+            "PartitionKey": "TR01TimeOffRecords",
+            "RowKey": "Delta",
+            "IsPublished": "false"
+        },
+        {
+            "PartitionKey": "TR01TimeOffRecords",
+            "RowKey": "Full",
+            "IsPublished": "false",
+            "LastProcessedRecordCount": 0,
+            "DeviationPercentage": 0            
+        },
+        {
+            "PartitionKey": "TR01TimeOffRecordsS",
+            "RowKey": "Delta",
+            "IsPublished": "false"
+        },
+        {
+            "PartitionKey": "TR01TimeOffRecordsS",
+            "RowKey": "Full",
+            "IsPublished": "false",
+            "LastProcessedRecordCount": 0,
+            "DeviationPercentage": 0            
+        },
+        {
+            "PartitionKey": "TR01TimeRecords",
+            "RowKey": "Delta",
+            "IsPublished": "false"
+        },
+        {
+            "PartitionKey": "TR01TimeRecords",
+            "RowKey": "Full",
+            "IsPublished": "false",
+            "LastProcessedRecordCount": 0,
+            "DeviationPercentage": 0            
+        }
+    ]
+}

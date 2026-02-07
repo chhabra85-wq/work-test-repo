@@ -1,0 +1,86 @@
+{
+	"name": "DataflowLOAJsonOutput",
+	"properties": {
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "WFSCsvFiles",
+						"type": "DatasetReference"
+					},
+					"name": "ReadWFSLoaCsvFile"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "CartierBlobJsonFile",
+						"type": "DatasetReference"
+					},
+					"name": "CreateJsonFile"
+				}
+			],
+			"transformations": [
+				{
+					"name": "TransformLOAData"
+				},
+				{
+					"name": "Select"
+				}
+			],
+			"scriptLines": [
+				"parameters{",
+				"     FileName as string",
+				"}",
+				"source(output(",
+				"          caseID as short,",
+				"          startDate as date 'MM/dd/yyyy',",
+				"          endDate as date 'MM/dd/yyyy',",
+				"          lastDayWorked as date 'MM/dd/yyyy',",
+				"          leaveTypes as string,",
+				"          workCompIndicator as boolean,",
+				"          employeeId as integer,",
+				"          pfmlBalance as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     ignoreNoFilesFound: false,",
+				"     wildcardPaths:[($FileName)]) ~> ReadWFSLoaCsvFile",
+				"ReadWFSLoaCsvFile derive(claimGroupIdentifier = iif(workCompIndicator,\"00007\",\"00001\"),",
+				"          productTypeCode = 'STD',",
+				"          benefitPlanIdentifier = 'WDIXX',",
+				"          coverageId = 'COV1_1',",
+				"          wapfmlBalance = iif(isNull(pfmlBalance),\"\",pfmlBalance)) ~> TransformLOAData",
+				"TransformLOAData select(mapColumn(",
+				"          employeeId,",
+				"          lastDayWorked,",
+				"          claimGroupIdentifier,",
+				"          claimGroupIdentifier,",
+				"          productTypeCode,",
+				"          benefitPlanIdentifier,",
+				"          coverageId,",
+				"          wapfmlBalance",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> Select",
+				"Select sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     partitionFileNames:[(replace($FileName,'.csv','.json'))],",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     saveOrder: 1,",
+				"     mapColumn(",
+				"          employeeId,",
+				"          lastDayWorked,",
+				"          claimGroupIdentifier,",
+				"          productTypeCode,",
+				"          benefitPlanIdentifier,",
+				"          coverageId,",
+				"          wapfmlBalance",
+				"     ),",
+				"     partitionBy('hash', 1)) ~> CreateJsonFile"
+			]
+		}
+	}
+}

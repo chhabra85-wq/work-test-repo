@@ -1,0 +1,1632 @@
+{
+	"name": "Pull_Wfs_Metadata_Inner_Child",
+	"properties": {
+		"activities": [
+			{
+				"name": "Map File Name",
+				"description": "Map file names from WFS to HRDL",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "MappedFileName",
+					"value": {
+						"value": "@{\n    if(equals(pipeline().parameters.FileName, 'BANK_policy_info_export.csv'), 'TR01TimeBalancesMeta', \n    if(equals(pipeline().parameters.FileName, 'PAY_CODE_policy_info_export.csv'), 'TR01TimeMeta',\n    if(equals(pipeline().parameters.FileName, 'TOR_ABSENCE_TYPE_policy_info_export.csv'), 'TR01TimeOffMeta', \n    if(equals(pipeline().parameters.FileName, 'bank_balance_export.csv'), 'TR01TimeOffBalances', \n    'InvalidFile'))))}",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Switch Metadata",
+				"description": "We need the Switch Activity to customize the mapping for each file. Inside this switch, the pipeline will copy the data from WFS SFTP to Cartier blob container and map the column names.",
+				"type": "Switch",
+				"dependsOn": [
+					{
+						"activity": "If File Record Count Invalid",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"on": {
+						"value": "@variables('MappedFileName')",
+						"type": "Expression"
+					},
+					"cases": [
+						{
+							"value": "TR01TimeBalancesMeta",
+							"activities": [
+								{
+									"name": "Copy Bank Metadata",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "DelimitedTextSource",
+											"storeSettings": {
+												"type": "SftpReadSettings",
+												"recursive": true,
+												"enablePartitionDiscovery": false,
+												"disableChunking": false
+											},
+											"formatSettings": {
+												"type": "DelimitedTextReadSettings"
+											}
+										},
+										"sink": {
+											"type": "ParquetSink",
+											"storeSettings": {
+												"type": "AzureBlobStorageWriteSettings"
+											},
+											"formatSettings": {
+												"type": "ParquetWriteSettings"
+											}
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"mappings": [
+												{
+													"source": {
+														"name": "BANK_NAME",
+														"type": "String",
+														"physicalType": "String"
+													},
+													"sink": {
+														"name": "BankName",
+														"physicalType": "UTF8"
+													}
+												},
+												{
+													"source": {
+														"name": "SHORT_DESCRIPTION",
+														"type": "String",
+														"physicalType": "String"
+													},
+													"sink": {
+														"name": "ShortDescription",
+														"physicalType": "UTF8"
+													}
+												},
+												{
+													"source": {
+														"name": "UNITS",
+														"type": "String",
+														"physicalType": "String"
+													},
+													"sink": {
+														"name": "Units",
+														"physicalType": "UTF8"
+													}
+												}
+											],
+											"typeConversion": true,
+											"typeConversionSettings": {
+												"allowDataTruncation": true,
+												"treatBooleanAsNumber": false
+											}
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "WfsSftp",
+											"type": "DatasetReference",
+											"parameters": {
+												"FileName": {
+													"value": "@pipeline().parameters.FileName",
+													"type": "Expression"
+												}
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "CartierBlobStorage",
+											"type": "DatasetReference",
+											"parameters": {
+												"Directory": {
+													"value": "user/trusted-service-user/gold/TR01/@{variables('MappedFileName')}/Full/@{pipeline().parameters.PipelineRunTime}",
+													"type": "Expression"
+												},
+												"BlobName": {
+													"value": "D_@{variables('MappedFileName')}_@{substring(pipeline().parameters.PipelineRunTime,0,4)}_@{substring(pipeline().parameters.PipelineRunTime,4,2)}_@{substring(pipeline().parameters.PipelineRunTime,6,2)}_@{substring(pipeline().parameters.PipelineRunTime,8,2)}_@{substring(pipeline().parameters.PipelineRunTime,10,2)}_00.snappy.parquet",
+													"type": "Expression"
+												},
+												"Container": "cartier"
+											}
+										}
+									]
+								}
+							]
+						},
+						{
+							"value": "TR01TimeMeta",
+							"activities": [
+								{
+									"name": "Copy Pay Code Metadata",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "DelimitedTextSource",
+											"storeSettings": {
+												"type": "SftpReadSettings",
+												"recursive": true,
+												"enablePartitionDiscovery": false,
+												"disableChunking": false
+											},
+											"formatSettings": {
+												"type": "DelimitedTextReadSettings"
+											}
+										},
+										"sink": {
+											"type": "ParquetSink",
+											"storeSettings": {
+												"type": "AzureBlobStorageWriteSettings"
+											},
+											"formatSettings": {
+												"type": "ParquetWriteSettings"
+											}
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"mappings": [
+												{
+													"source": {
+														"name": "PAY_CODE_NAME",
+														"type": "String",
+														"physicalType": "String"
+													},
+													"sink": {
+														"name": "PayCodeName",
+														"physicalType": "UTF8"
+													}
+												},
+												{
+													"source": {
+														"name": "SHORT_DESCRIPTION",
+														"type": "String",
+														"physicalType": "String"
+													},
+													"sink": {
+														"name": "ShortDescription",
+														"physicalType": "UTF8"
+													}
+												},
+												{
+													"source": {
+														"name": "ENTRY_FIELD",
+														"type": "String",
+														"physicalType": "String"
+													},
+													"sink": {
+														"name": "Unit",
+														"physicalType": "UTF8"
+													}
+												}
+											],
+											"typeConversion": true,
+											"typeConversionSettings": {
+												"allowDataTruncation": true,
+												"treatBooleanAsNumber": false
+											}
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "WfsSftp",
+											"type": "DatasetReference",
+											"parameters": {
+												"FileName": {
+													"value": "@pipeline().parameters.FileName",
+													"type": "Expression"
+												}
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "CartierBlobStorage",
+											"type": "DatasetReference",
+											"parameters": {
+												"Directory": {
+													"value": "user/trusted-service-user/gold/TR01/@{variables('MappedFileName')}/Full/@{pipeline().parameters.PipelineRunTime}",
+													"type": "Expression"
+												},
+												"BlobName": {
+													"value": "D_@{variables('MappedFileName')}_@{substring(pipeline().parameters.PipelineRunTime,0,4)}_@{substring(pipeline().parameters.PipelineRunTime,4,2)}_@{substring(pipeline().parameters.PipelineRunTime,6,2)}_@{substring(pipeline().parameters.PipelineRunTime,8,2)}_@{substring(pipeline().parameters.PipelineRunTime,10,2)}_00.snappy.parquet",
+													"type": "Expression"
+												},
+												"Container": "cartier"
+											}
+										}
+									]
+								},
+								{
+									"name": "Insert to PayCodeMetadata table",
+									"type": "Copy",
+									"dependsOn": [
+										{
+											"activity": "Copy Pay Code Metadata",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "DelimitedTextSource",
+											"storeSettings": {
+												"type": "SftpReadSettings",
+												"recursive": true,
+												"enablePartitionDiscovery": false,
+												"disableChunking": false
+											},
+											"formatSettings": {
+												"type": "DelimitedTextReadSettings"
+											}
+										},
+										"sink": {
+											"type": "AzureTableSink",
+											"azureTableInsertType": "merge",
+											"azureTableDefaultPartitionKeyValue": "PAY_CODE",
+											"azureTableRowKeyName": {
+												"value": "PAY_CODE_NAME",
+												"type": "Expression"
+											},
+											"writeBatchSize": 10000
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"typeConversion": true,
+											"typeConversionSettings": {
+												"allowDataTruncation": true,
+												"treatBooleanAsNumber": false
+											}
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "WfsSftp",
+											"type": "DatasetReference",
+											"parameters": {
+												"FileName": {
+													"value": "@pipeline().parameters.FileName",
+													"type": "Expression"
+												}
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "CartierTableStorage",
+											"type": "DatasetReference",
+											"parameters": {
+												"StorageAccountName": "strcartierdev",
+												"TableName": "PayCodeMetadata"
+											}
+										}
+									]
+								}
+							]
+						},
+						{
+							"value": "TR01TimeOffMeta",
+							"activities": [
+								{
+									"name": "Copy TOR Absence Type Metadata",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "DelimitedTextSource",
+											"storeSettings": {
+												"type": "SftpReadSettings",
+												"recursive": true,
+												"enablePartitionDiscovery": false,
+												"disableChunking": false
+											},
+											"formatSettings": {
+												"type": "DelimitedTextReadSettings"
+											}
+										},
+										"sink": {
+											"type": "ParquetSink",
+											"storeSettings": {
+												"type": "AzureBlobStorageWriteSettings"
+											},
+											"formatSettings": {
+												"type": "ParquetWriteSettings"
+											}
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"mappings": [
+												{
+													"source": {
+														"name": "ABSENCE_TYPE",
+														"type": "String"
+													},
+													"sink": {
+														"name": "AbsenceType"
+													}
+												},
+												{
+													"source": {
+														"name": "DESCRIPTION",
+														"type": "String"
+													},
+													"sink": {
+														"name": "Description"
+													}
+												},
+												{
+													"source": {
+														"name": "DEFAULT_PAY_CODE",
+														"type": "String"
+													},
+													"sink": {
+														"name": "DefaultPayCode"
+													}
+												}
+											],
+											"typeConversion": true,
+											"typeConversionSettings": {
+												"allowDataTruncation": true,
+												"treatBooleanAsNumber": false
+											}
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "WfsSftp",
+											"type": "DatasetReference",
+											"parameters": {
+												"FileName": {
+													"value": "@pipeline().parameters.FileName",
+													"type": "Expression"
+												}
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "CartierBlobStorage",
+											"type": "DatasetReference",
+											"parameters": {
+												"Directory": {
+													"value": "user/trusted-service-user/gold/TR01/@{variables('MappedFileName')}/Full/@{pipeline().parameters.PipelineRunTime}",
+													"type": "Expression"
+												},
+												"BlobName": "D_@{variables('MappedFileName')}_@{substring(pipeline().parameters.PipelineRunTime,0,4)}_@{substring(pipeline().parameters.PipelineRunTime,4,2)}_@{substring(pipeline().parameters.PipelineRunTime,6,2)}_@{substring(pipeline().parameters.PipelineRunTime,8,2)}_@{substring(pipeline().parameters.PipelineRunTime,10,2)}_00.snappy.parquet"
+											}
+										}
+									]
+								}
+							]
+						},
+						{
+							"value": "TR01TimeOffBalances",
+							"activities": [
+								{
+									"name": "Copy Bank Balance Export",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "DelimitedTextSource",
+											"storeSettings": {
+												"type": "SftpReadSettings",
+												"recursive": true,
+												"enablePartitionDiscovery": false,
+												"disableChunking": false
+											},
+											"formatSettings": {
+												"type": "DelimitedTextReadSettings"
+											}
+										},
+										"sink": {
+											"type": "ParquetSink",
+											"storeSettings": {
+												"type": "AzureBlobStorageWriteSettings"
+											},
+											"formatSettings": {
+												"type": "ParquetWriteSettings"
+											}
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"mappings": [
+												{
+													"source": {
+														"name": "EMPLOYEE_ID",
+														"type": "String",
+														"physicalType": "String"
+													},
+													"sink": {
+														"name": "PersonnelNumber",
+														"physicalType": "UTF8"
+													}
+												},
+												{
+													"source": {
+														"name": "BANK_NAME",
+														"type": "String",
+														"physicalType": "String"
+													},
+													"sink": {
+														"name": "BankName",
+														"physicalType": "UTF8"
+													}
+												},
+												{
+													"source": {
+														"name": "UNIT",
+														"type": "String",
+														"physicalType": "String"
+													},
+													"sink": {
+														"name": "Unit",
+														"physicalType": "UTF8"
+													}
+												},
+												{
+													"source": {
+														"name": "USED",
+														"type": "String",
+														"physicalType": "String"
+													},
+													"sink": {
+														"name": "Used",
+														"physicalType": "UTF8"
+													}
+												},
+												{
+													"source": {
+														"name": "BALANCE",
+														"type": "String",
+														"physicalType": "String"
+													},
+													"sink": {
+														"name": "Balance",
+														"physicalType": "UTF8"
+													}
+												},
+												{
+													"source": {
+														"name": "AS_OF_DATE",
+														"type": "String",
+														"physicalType": "String"
+													},
+													"sink": {
+														"name": "AsOfDate",
+														"physicalType": "UTF8"
+													}
+												}
+											],
+											"typeConversion": true,
+											"typeConversionSettings": {
+												"allowDataTruncation": true,
+												"treatBooleanAsNumber": false
+											}
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "WfsSftp",
+											"type": "DatasetReference",
+											"parameters": {
+												"FileName": {
+													"value": "@pipeline().parameters.FileName",
+													"type": "Expression"
+												}
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "CartierBlobStorage",
+											"type": "DatasetReference",
+											"parameters": {
+												"Directory": {
+													"value": "user/trusted-service-user/gold/TR01/@{variables('MappedFileName')}/Full/@{pipeline().parameters.PipelineRunTime}",
+													"type": "Expression"
+												},
+												"BlobName": {
+													"value": "D_@{variables('MappedFileName')}_@{substring(pipeline().parameters.PipelineRunTime,0,4)}_@{substring(pipeline().parameters.PipelineRunTime,4,2)}_@{substring(pipeline().parameters.PipelineRunTime,6,2)}_@{substring(pipeline().parameters.PipelineRunTime,8,2)}_@{substring(pipeline().parameters.PipelineRunTime,10,2)}_00.snappy.parquet",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								}
+							]
+						}
+					]
+				}
+			},
+			{
+				"name": "If Mapped File Name Is Valid",
+				"description": "",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "Switch Metadata",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@not(equals(variables('MappedFileName'),'InvalidFile'))\n",
+						"type": "Expression"
+					},
+					"ifTrueActivities": [
+						{
+							"name": "Update File Path at HRDLFilePublishDetails",
+							"description": "Update the latest file path so the main HRDL pipeline can get the latest one.",
+							"type": "WebActivity",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"url": {
+									"value": "https://strcartierdev.table.core.windows.net/HRDLFilePublishDetails(PartitionKey='@{variables('MappedFileName')}',RowKey='Metadata')",
+									"type": "Expression"
+								},
+								"connectVia": {
+									"referenceName": "AutoResolveIntegrationRuntime",
+									"type": "IntegrationRuntimeReference"
+								},
+								"method": "PATCH",
+								"headers": {
+									"Content-Type": "application/json",
+									"x-ms-version": "2020-04-08",
+									"Accept": "application/json;odata=nometadata"
+								},
+								"body": {
+									"value": "{\n    \"LatestSourceDataPath\": \"user/trusted-service-user/gold/TR01/@{variables('MappedFileName')}/Full/@{pipeline().parameters.PipelineRunTime}/D_@{variables('MappedFileName')}_@{substring(pipeline().parameters.PipelineRunTime,0,4)}_@{substring(pipeline().parameters.PipelineRunTime,4,2)}_@{substring(pipeline().parameters.PipelineRunTime,6,2)}_@{substring(pipeline().parameters.PipelineRunTime,8,2)}_@{substring(pipeline().parameters.PipelineRunTime,10,2)}_00.snappy.parquet\",\n    \"LatestHandshakePath\": \"user/trusted-service-user/gold/TR01/@{variables('MappedFileName')}/Full/Handshake\",\n    \"LatestFolderName\":\"@{pipeline().parameters.PipelineRunTime}\",\n    \"IsPublished\" : false,\n    \"LastProcessedRecordCount\": @{variables('CurrentRecordCount')}\n}",
+									"type": "Expression"
+								},
+								"authentication": {
+									"type": "MSI",
+									"resource": "https://storage.azure.com/"
+								}
+							}
+						},
+						{
+							"name": "Create Handshake File",
+							"type": "Copy",
+							"dependsOn": [
+								{
+									"activity": "Update File Path at HRDLFilePublishDetails",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureTableSource",
+									"azureTableSourceQuery": {
+										"value": "PartitionKey eq '@{variables('MappedFileName')}'",
+										"type": "Expression"
+									},
+									"azureTableSourceIgnoreTableNotFound": false
+								},
+								"sink": {
+									"type": "ParquetSink",
+									"storeSettings": {
+										"type": "AzureBlobStorageWriteSettings"
+									},
+									"formatSettings": {
+										"type": "ParquetWriteSettings"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"mappings": [
+										{
+											"source": {
+												"name": "LatestFolderName",
+												"type": "String"
+											},
+											"sink": {
+												"name": "LatestFolderName",
+												"type": "String",
+												"physicalType": "UTF8"
+											}
+										}
+									],
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "CartierTableStorage",
+									"type": "DatasetReference",
+									"parameters": {
+										"StorageAccountName": "strcartierdev",
+										"TableName": "HRDLFilePublishDetails"
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "CartierBlobStorage",
+									"type": "DatasetReference",
+									"parameters": {
+										"Directory": {
+											"value": "user/trusted-service-user/gold/TR01/@{variables('MappedFileName')}/Full/Handshake",
+											"type": "Expression"
+										},
+										"BlobName": {
+											"value": "@{variables('MappedFileName')}Handshake.snappy.parquet",
+											"type": "Expression"
+										},
+										"Container": "cartier"
+									}
+								}
+							]
+						},
+						{
+							"name": "Delete File from WFS SFTP",
+							"type": "Delete",
+							"dependsOn": [
+								{
+									"activity": "Create Handshake File",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"dataset": {
+									"referenceName": "WfsSftp",
+									"type": "DatasetReference",
+									"parameters": {
+										"FileName": "@pipeline().parameters.FileName"
+									}
+								},
+								"enableLogging": false,
+								"storeSettings": {
+									"type": "SftpReadSettings",
+									"recursive": false,
+									"enablePartitionDiscovery": false,
+									"disableChunking": false
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Get Metadata Threshold Info",
+				"description": "This activity will get all entities for this Metadata file, this pipeline will use Get DeviationPercentage and LastProcessedRecordCount.",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Archive Metadata Files",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "https://strcartierdev.table.core.windows.net/HRDLFilePublishDetails(PartitionKey='@{variables('MappedFileName')}',RowKey='Metadata')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "AutoResolveIntegrationRuntime",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "GET",
+					"headers": {
+						"Content-Type": "application/json",
+						"x-ms-version": "2020-04-08",
+						"Accept": "application/json;odata=nometadata"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://storage.azure.com/"
+					}
+				}
+			},
+			{
+				"name": "If File Record Count Invalid",
+				"description": "If file record cout is invalid, update the mapped file name. Initial value for Record Count should be 0 and so any record after wiill be valid for the first time. The format we are using is AcceptableRecordCount = CurrentRecordCount - ( CurrentRecordCount * (DeviationPercentage/100) ) . And then compare that Acceptable ",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "Set Expected Record Count",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@if(equals(variables('PreviousRecordCount'), null), \n        false, less(variables('CurrentRecordCount'),variables('ExpectedRecordCount'))\n)",
+						"type": "Expression"
+					},
+					"ifTrueActivities": [
+						{
+							"name": "ICMConnectorFunction",
+							"type": "AzureFunctionActivity",
+							"dependsOn": [
+								{
+									"activity": "Set Mapped File Name To Invalid",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"functionName": "icmConnector",
+								"method": "POST",
+								"body": {
+									"value": "{Title: \"Synapse Analytics pipeline Metadata file is below threshold: @{pipeline().Pipeline} in @{pipeline().DataFactory}\", DescriptionText: \"<b>Current pipeline Run ID: </b>@{pipeline().RunId}<br><br>The metadata file @{pipeline().parameters.FileName} currently contains a total of @{variables('CurrentRecordCount')} records. This number falls short of the expected previous record count. It’s important to note that the current threshold for this specific file is set at deviation of @{variables('DeviationPercentage')}% - relative to the previous record count, which is at @{variables('PreviousRecordCount')} count.<br><br><b>Impact of this failure: </b>Metadata files describing time-off, attendance and accrual paytypes on HR Data lake will be stale.<br><br><b>What to verify?</b>:<li> Step 1: Contact WFS for this @{pipeline().parameters.FileName} file's record low count issue.<li> Step 2: Verify if this file @{pipeline().parameters.FileName}'s record count is valid. <li> Step 3: If this record count is not valid, ask WFS to drop the correct file with valid records. If this record count is valid, consider update LastProcessedRecordCount column in HRDLFilePublishDetails table to match with new record count, since the pipeline logic will only accept record count that is over a certain threshold.<br><br><b>Steps to recover from failure: </b> Please engage system integration team of WFS, asking them to run the custom export job to generate the file with correct record count. Run a new instance of this pipeline once DRI confirms that this file exist in SFTP location. The re-run option will expect parameter of an array with file names. Pass in the name of the file(s) like this: [\\\"@{pipeline().parameters.FileName}\\\"]. <b>Note:</b> If DRI re-run this pipeline without pass in parameter for the expected file(s), this pipeline will try to get four original files, and will trigger Icm tickets for any missing file. In this case, just link the Icm ticket with this incident. Or refer to the troubleshooting guide linked to this incident. It points to the TSG Markdown files in this service's repository. <br><br><b>Contacts to notify if this results in stale HR DL data: </b><a href mailto:tr01subscribers@microsoft.com>TR01Subscribers@microsoft.com</a><br>\", Severity: \"3\"\n}",
+									"type": "Expression"
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "ICMConnector",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "Set Mapped File Name To Invalid",
+							"description": "We are using file name as a flag",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"policy": {
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "MappedFileName",
+								"value": "InvalidFile"
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Archive Metadata Files",
+				"description": "We need the Switch Activity to customize the mapping for each file. Inside this switch, the pipeline will copy the data from WFS SFTP to Cartier blob container and map the column names.",
+				"type": "Switch",
+				"dependsOn": [
+					{
+						"activity": "Map File Name",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"on": {
+						"value": "@variables('MappedFileName')",
+						"type": "Expression"
+					},
+					"cases": [
+						{
+							"value": "TR01TimeBalancesMeta",
+							"activities": [
+								{
+									"name": "Archive Bank Metadata",
+									"description": "Archive metadata files each day into container",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "DelimitedTextSource",
+											"storeSettings": {
+												"type": "SftpReadSettings",
+												"recursive": true,
+												"enablePartitionDiscovery": false,
+												"disableChunking": false
+											},
+											"formatSettings": {
+												"type": "DelimitedTextReadSettings"
+											}
+										},
+										"sink": {
+											"type": "DelimitedTextSink",
+											"storeSettings": {
+												"type": "AzureBlobStorageWriteSettings"
+											},
+											"formatSettings": {
+												"type": "DelimitedTextWriteSettings",
+												"quoteAllText": true,
+												"fileExtension": ".txt"
+											}
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"mappings": [
+												{
+													"source": {
+														"name": "BANK_NAME",
+														"type": "String",
+														"physicalType": "String"
+													},
+													"sink": {
+														"name": "BANK_NAME",
+														"type": "String",
+														"physicalType": "String"
+													}
+												},
+												{
+													"source": {
+														"name": "SHORT_DESCRIPTION",
+														"type": "String",
+														"physicalType": "String"
+													},
+													"sink": {
+														"name": "SHORT_DESCRIPTION",
+														"type": "String",
+														"physicalType": "String"
+													}
+												},
+												{
+													"source": {
+														"name": "UNITS",
+														"type": "String",
+														"physicalType": "String"
+													},
+													"sink": {
+														"name": "UNITS",
+														"type": "String",
+														"physicalType": "String"
+													}
+												}
+											],
+											"typeConversion": true,
+											"typeConversionSettings": {
+												"allowDataTruncation": true,
+												"treatBooleanAsNumber": false
+											}
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "WfsSftp",
+											"type": "DatasetReference",
+											"parameters": {
+												"FileName": {
+													"value": "@pipeline().parameters.FileName",
+													"type": "Expression"
+												}
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "CartierBlobDelimitedText",
+											"type": "DatasetReference",
+											"parameters": {
+												"Directory": {
+													"value": "@pipeline().parameters.PipelineRunTime",
+													"type": "Expression"
+												},
+												"FileName": {
+													"value": "@pipeline().parameters.FileName",
+													"type": "Expression"
+												},
+												"Container": "wfs-metadata-archive"
+											}
+										}
+									]
+								},
+								{
+									"name": "Set Current Record Count Bank Metadata",
+									"type": "SetVariable",
+									"dependsOn": [
+										{
+											"activity": "Archive Bank Metadata",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "CurrentRecordCount",
+										"value": {
+											"value": "@activity('Archive Bank Metadata').output.rowsCopied",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "TR01TimeMeta",
+							"activities": [
+								{
+									"name": "Archive Pay Code Metadata",
+									"description": "Archive metadata files each day into container",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "DelimitedTextSource",
+											"storeSettings": {
+												"type": "SftpReadSettings",
+												"recursive": true,
+												"enablePartitionDiscovery": false,
+												"disableChunking": false
+											},
+											"formatSettings": {
+												"type": "DelimitedTextReadSettings"
+											}
+										},
+										"sink": {
+											"type": "DelimitedTextSink",
+											"storeSettings": {
+												"type": "AzureBlobStorageWriteSettings"
+											},
+											"formatSettings": {
+												"type": "DelimitedTextWriteSettings",
+												"quoteAllText": true,
+												"fileExtension": ".txt"
+											}
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"mappings": [
+												{
+													"source": {
+														"name": "PAY_CODE_NAME",
+														"type": "String",
+														"physicalType": "String"
+													},
+													"sink": {
+														"name": "PAY_CODE_NAME",
+														"type": "String",
+														"physicalType": "String"
+													}
+												},
+												{
+													"source": {
+														"name": "SHORT_DESCRIPTION",
+														"type": "String",
+														"physicalType": "String"
+													},
+													"sink": {
+														"name": "SHORT_DESCRIPTION",
+														"type": "String",
+														"physicalType": "String"
+													}
+												},
+												{
+													"source": {
+														"name": "ENTRY_FIELD",
+														"type": "String",
+														"physicalType": "String"
+													},
+													"sink": {
+														"name": "ENTRY_FIELD",
+														"type": "String",
+														"physicalType": "String"
+													}
+												}
+											],
+											"typeConversion": true,
+											"typeConversionSettings": {
+												"allowDataTruncation": true,
+												"treatBooleanAsNumber": false
+											}
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "WfsSftp",
+											"type": "DatasetReference",
+											"parameters": {
+												"FileName": {
+													"value": "@pipeline().parameters.FileName",
+													"type": "Expression"
+												}
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "CartierBlobDelimitedText",
+											"type": "DatasetReference",
+											"parameters": {
+												"Directory": {
+													"value": "@pipeline().parameters.PipelineRunTime",
+													"type": "Expression"
+												},
+												"FileName": {
+													"value": "@pipeline().parameters.FileName",
+													"type": "Expression"
+												},
+												"Container": "wfs-metadata-archive"
+											}
+										}
+									]
+								},
+								{
+									"name": "Set Current Record Count Bank Metadata_copy1",
+									"type": "SetVariable",
+									"dependsOn": [
+										{
+											"activity": "Archive Pay Code Metadata",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "CurrentRecordCount",
+										"value": {
+											"value": "@activity('Archive Pay Code Metadata').output.rowsCopied",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "TR01TimeOffMeta",
+							"activities": [
+								{
+									"name": "Archive TOR Absence Type Metadata",
+									"description": "Archive metadata files each day into container",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "DelimitedTextSource",
+											"storeSettings": {
+												"type": "SftpReadSettings",
+												"recursive": true,
+												"enablePartitionDiscovery": false,
+												"disableChunking": false
+											},
+											"formatSettings": {
+												"type": "DelimitedTextReadSettings"
+											}
+										},
+										"sink": {
+											"type": "DelimitedTextSink",
+											"storeSettings": {
+												"type": "AzureBlobStorageWriteSettings"
+											},
+											"formatSettings": {
+												"type": "DelimitedTextWriteSettings",
+												"quoteAllText": true,
+												"fileExtension": ".txt"
+											}
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"mappings": [
+												{
+													"source": {
+														"name": "ABSENCE_TYPE",
+														"type": "String",
+														"physicalType": "String"
+													},
+													"sink": {
+														"name": "ABSENCE_TYPE",
+														"type": "String",
+														"physicalType": "String"
+													}
+												},
+												{
+													"source": {
+														"name": "DESCRIPTION",
+														"type": "String",
+														"physicalType": "String"
+													},
+													"sink": {
+														"name": "DESCRIPTION",
+														"type": "String",
+														"physicalType": "String"
+													}
+												},
+												{
+													"source": {
+														"name": "DEFAULT_PAY_CODE",
+														"type": "String",
+														"physicalType": "String"
+													},
+													"sink": {
+														"name": "DEFAULT_PAY_CODE",
+														"type": "String",
+														"physicalType": "String"
+													}
+												}
+											],
+											"typeConversion": true,
+											"typeConversionSettings": {
+												"allowDataTruncation": true,
+												"treatBooleanAsNumber": false
+											}
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "WfsSftp",
+											"type": "DatasetReference",
+											"parameters": {
+												"FileName": {
+													"value": "@pipeline().parameters.FileName",
+													"type": "Expression"
+												}
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "CartierBlobDelimitedText",
+											"type": "DatasetReference",
+											"parameters": {
+												"Directory": {
+													"value": "@pipeline().parameters.PipelineRunTime",
+													"type": "Expression"
+												},
+												"FileName": {
+													"value": "@pipeline().parameters.FileName",
+													"type": "Expression"
+												},
+												"Container": "wfs-metadata-archive"
+											}
+										}
+									]
+								},
+								{
+									"name": "Set Current Record Count TOR Absence Type Metadata",
+									"type": "SetVariable",
+									"dependsOn": [
+										{
+											"activity": "Archive TOR Absence Type Metadata",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "CurrentRecordCount",
+										"value": {
+											"value": "@activity('Archive TOR Absence Type Metadata').output.rowsCopied",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "TR01TimeOffBalances",
+							"activities": [
+								{
+									"name": "Archive Bank Balance Export",
+									"description": "Archive metadata files each day into container",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "DelimitedTextSource",
+											"storeSettings": {
+												"type": "SftpReadSettings",
+												"recursive": true,
+												"enablePartitionDiscovery": false,
+												"disableChunking": false
+											},
+											"formatSettings": {
+												"type": "DelimitedTextReadSettings"
+											}
+										},
+										"sink": {
+											"type": "DelimitedTextSink",
+											"storeSettings": {
+												"type": "AzureBlobStorageWriteSettings"
+											},
+											"formatSettings": {
+												"type": "DelimitedTextWriteSettings",
+												"quoteAllText": true,
+												"fileExtension": ".txt"
+											}
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"mappings": [
+												{
+													"source": {
+														"name": "EMPLOYEE_ID",
+														"type": "String",
+														"physicalType": "String"
+													},
+													"sink": {
+														"name": "EMPLOYEE_ID",
+														"type": "String",
+														"physicalType": "String"
+													}
+												},
+												{
+													"source": {
+														"name": "BANK_NAME",
+														"type": "String",
+														"physicalType": "String"
+													},
+													"sink": {
+														"name": "BANK_NAME",
+														"type": "String",
+														"physicalType": "String"
+													}
+												},
+												{
+													"source": {
+														"name": "UNIT",
+														"type": "String",
+														"physicalType": "String"
+													},
+													"sink": {
+														"name": "UNIT",
+														"type": "String",
+														"physicalType": "String"
+													}
+												},
+												{
+													"source": {
+														"name": "USED",
+														"type": "String",
+														"physicalType": "String"
+													},
+													"sink": {
+														"name": "USED",
+														"type": "String",
+														"physicalType": "String"
+													}
+												},
+												{
+													"source": {
+														"name": "BALANCE",
+														"type": "String",
+														"physicalType": "String"
+													},
+													"sink": {
+														"name": "BALANCE",
+														"type": "String",
+														"physicalType": "String"
+													}
+												},
+												{
+													"source": {
+														"name": "AS_OF_DATE",
+														"type": "String",
+														"physicalType": "String"
+													},
+													"sink": {
+														"name": "AS_OF_DATE",
+														"type": "String",
+														"physicalType": "String"
+													}
+												}
+											],
+											"typeConversion": true,
+											"typeConversionSettings": {
+												"allowDataTruncation": true,
+												"treatBooleanAsNumber": false
+											}
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "WfsSftp",
+											"type": "DatasetReference",
+											"parameters": {
+												"FileName": {
+													"value": "@pipeline().parameters.FileName",
+													"type": "Expression"
+												}
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "CartierBlobDelimitedText",
+											"type": "DatasetReference",
+											"parameters": {
+												"Directory": {
+													"value": "@pipeline().parameters.PipelineRunTime",
+													"type": "Expression"
+												},
+												"FileName": {
+													"value": "@pipeline().parameters.FileName",
+													"type": "Expression"
+												},
+												"Container": "wfs-metadata-archive"
+											}
+										}
+									]
+								},
+								{
+									"name": "Set Current Record Count Bank Balance Export",
+									"type": "SetVariable",
+									"dependsOn": [
+										{
+											"activity": "Archive Bank Balance Export",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "CurrentRecordCount",
+										"value": {
+											"value": "@activity('Archive Bank Balance Export').output.rowsCopied",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						}
+					]
+				}
+			},
+			{
+				"name": "Set Deviation Percentage",
+				"description": "Metadata files' deviation percentage is set at 0%. Other files' deviation percentage is set at 10%. This task is to get the deviation percentage for this specific file in Azure table.",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Get Metadata Threshold Info",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "DeviationPercentage",
+					"value": {
+						"value": "@activity('Get Metadata Threshold Info').output.DeviationPercentage",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Set Expected Record Count",
+				"description": "Set Expected Record Count from the value of LastProcessedRecordCount in HRDLFilePublishDetails table, by subtracting that previous count LastProcessedRecordCount from the deviation.",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Set Previous Record Count",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "ExpectedRecordCount",
+					"value": {
+						"value": "@int(split(string(sub(variables('PreviousRecordCount'),mul(variables('PreviousRecordCount'), div(float(variables('DeviationPercentage')),float(100))))), '.')[0])",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Set Previous Record Count",
+				"description": "This is the value of LastProcessedRecordCount in HRDLFilePublishDetails table.",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Set Deviation Percentage",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "PreviousRecordCount",
+					"value": {
+						"value": "@activity('Get Metadata Threshold Info').output.LastProcessedRecordCount",
+						"type": "Expression"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"FileName": {
+				"type": "string"
+			},
+			"PipelineRunTime": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"MappedFileName": {
+				"type": "String"
+			},
+			"DeviationPercentage": {
+				"type": "Integer"
+			},
+			"CurrentRecordCount": {
+				"type": "Integer"
+			},
+			"ExpectedRecordCount": {
+				"type": "Integer"
+			},
+			"PreviousRecordCount": {
+				"type": "Integer"
+			}
+		},
+		"folder": {
+			"name": "WFS"
+		},
+		"annotations": []
+	}
+}

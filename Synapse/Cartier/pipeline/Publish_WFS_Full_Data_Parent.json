@@ -1,0 +1,60 @@
+{
+	"name": "Publish_WFS_Full_Data_Parent",
+	"properties": {
+		"activities": [
+			{
+				"name": "Execute Publish_HRDL_Entities_Parent_Full",
+				"description": "Parent pipeline in charge of calling child, child_data_lake_publish_pipeline, to execute the ingestion, transformation & publishing of WFS API data into HRDL.",
+				"type": "ExecutePipeline",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "Publish_HRDL_Entities_Parent",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"JobType": "Full"
+					}
+				}
+			},
+			{
+				"name": "ICMConnectorFunction",
+				"type": "AzureFunctionActivity",
+				"dependsOn": [
+					{
+						"activity": "Execute Publish_HRDL_Entities_Parent_Full",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"functionName": "icmConnector",
+					"method": "POST",
+					"body": {
+						"value": "{\nTitle: \"Synapse Analytics pipeline failure: @{pipeline().Pipeline} in @{pipeline().DataFactory} identified a failure\",\nDescriptionText: \"<br><u><b><h3>@{pipeline().Pipeline} in @{pipeline().DataFactory} identified a failure.</h3></b></u><b>Current pipeline Run ID: </b>@{pipeline().RunId}<br><br><b>Failed child pipeline: </b>@{activity('Execute Publish_HRDL_Entities_Parent_Full').output.pipelineName}'s run ID @{activity('Execute Publish_HRDL_Entities_Parent_Full').output.pipelineRunId}<b>About this pipeline: </b>This pipeline is scheduled to run daily at 6 AM/6 PM PT. It publishes the full files that were prepared by the previous execution of Pull_WFS_Data_Parent pipeline into HR Data Lake's publish TR01, along with corresponding handshake values. <br><br><b>Impact of this failure: </b>TR01 entities on HR Data Lake will be stale. Consumers of those entities will not get the latest data that was extracted from WFS.<br><br><b>What to verify?</b>:<li> Step 1: Look up the failed pipeline's runID @{activity('Execute Publish_HRDL_Entities_Parent_Full').output.pipelineRunId} on Synapse Analytics --> Monitor --> Pipeline Runs. <li>Step 2: Click on that failed instance and drill into the pipeline execution steps until you find the failed task. <li> Step 3: Click on the failed task to look up the reason for failure. Refer to steps to recover from failure listed below. <br><br><b>Steps to recover from failure: </b> Refer to the troubleshooting guide linked to this incident. It points to the TSG MD files in this service's repository. <br><br><b>Contacts to notify about stale HR DL data in TR01 entities: </b><a href mailto:tr01subscribers@microsoft.com>TR01Subscribers@microsoft.com</a><br>\",\nSeverity: \"3\",\nCorrelationId: \"WFSPublishFailure\"\n}",
+						"type": "Expression"
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "ICMConnector",
+					"type": "LinkedServiceReference"
+				}
+			}
+		],
+		"folder": {
+			"name": "WFS/Publish"
+		},
+		"annotations": []
+	}
+}

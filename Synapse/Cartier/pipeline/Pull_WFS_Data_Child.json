@@ -1,0 +1,347 @@
+{
+	"name": "Pull_WFS_Data_Child",
+	"properties": {
+		"activities": [
+			{
+				"name": "FetchAPIMetadata",
+				"description": "Calls ApiMetaData table to retrieve API data leveraged by Notebooks.",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Set ExecutionTime",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureTableSource",
+						"azureTableSourceQuery": {
+							"value": "Enabled eq 'true'\n",
+							"type": "Expression"
+						},
+						"azureTableSourceIgnoreTableNotFound": false
+					},
+					"dataset": {
+						"referenceName": "CartierTableStorage",
+						"type": "DatasetReference",
+						"parameters": {
+							"StorageAccountName": "strcartierdev",
+							"TableName": "ApiMetaData"
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "ForEach API",
+				"description": "Iterates through each active API and executes the processing flow.",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "FetchAPIMetadata",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('FetchAPIMetadata').output.value",
+						"type": "Expression"
+					},
+					"isSequential": false,
+					"activities": [
+						{
+							"name": "Execute Ingestion",
+							"description": "Notebook responsible for ingestion of WFS API data. Data is retrieved, flattened & pushed to parquet file; location of file is stored in ApiMetaData table.",
+							"type": "SynapseNotebook",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"notebook": {
+									"referenceName": "ingest_runners_data_to_storage",
+									"type": "NotebookReference"
+								},
+								"parameters": {
+									"api_name": {
+										"value": {
+											"value": "@{item().RowKey}",
+											"type": "Expression"
+										},
+										"type": "string"
+									},
+									"api_host_name": {
+										"value": {
+											"value": "https://api-us8.wfs.cloud",
+											"type": "Expression"
+										},
+										"type": "string"
+									},
+									"record_count_to_request": {
+										"value": {
+											"value": "@item().RecordCountToRequest",
+											"type": "Expression"
+										},
+										"type": "int"
+									},
+									"version": {
+										"value": {
+											"value": "@item().Version",
+											"type": "Expression"
+										},
+										"type": "string"
+									},
+									"run_execution_time": {
+										"value": {
+											"value": "@variables('Execution_Time')",
+											"type": "Expression"
+										},
+										"type": "string"
+									},
+									"run_id": {
+										"value": {
+											"value": "@pipeline().RunId",
+											"type": "Expression"
+										},
+										"type": "string"
+									}
+								},
+								"snapshot": true,
+								"sparkPool": {
+									"referenceName": "cartierpoolv34",
+									"type": "BigDataPoolReference"
+								},
+								"executorSize": "Medium",
+								"conf": {
+									"spark.dynamicAllocation.enabled": null,
+									"spark.dynamicAllocation.minExecutors": null,
+									"spark.dynamicAllocation.maxExecutors": null
+								},
+								"driverSize": "Medium",
+								"numExecutors": null
+							}
+						},
+						{
+							"name": "Execute Transformation",
+							"description": "Notebook responsible for transformation of WFS API data. Data is retrieved from parquet location, transformed & pushed to Delta (changes) & Full (persistent delta table) files; location of files are stored in ApiMetaData table.",
+							"type": "SynapseNotebook",
+							"dependsOn": [
+								{
+									"activity": "Execute Ingestion",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.02:00:00",
+								"retry": 1,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"notebook": {
+									"referenceName": "transformation_runner",
+									"type": "NotebookReference"
+								},
+								"parameters": {
+									"data_type": {
+										"value": {
+											"value": "@{item().RowKey}",
+											"type": "Expression"
+										},
+										"type": "string"
+									},
+									"run_id": {
+										"value": {
+											"value": "@pipeline().RunId",
+											"type": "Expression"
+										},
+										"type": "string"
+									},
+									"run_execution_time": {
+										"value": {
+											"value": "@variables('Execution_Time')",
+											"type": "Expression"
+										},
+										"type": "string"
+									}
+								},
+								"snapshot": true,
+								"sparkPool": {
+									"referenceName": "cartierpoolv34",
+									"type": "BigDataPoolReference"
+								},
+								"executorSize": "Medium",
+								"conf": {
+									"spark.dynamicAllocation.enabled": null,
+									"spark.dynamicAllocation.minExecutors": null,
+									"spark.dynamicAllocation.maxExecutors": null
+								},
+								"driverSize": "Medium",
+								"numExecutors": null
+							}
+						},
+						{
+							"name": "Execute Publishing",
+							"description": "Notebook responsible for publishing of WFS API data. Data is retrieved from locations, final schema is set & pushed to Delta (changes) & Full (persistent delta table) parquets for HRDL push; location of files are stored in ApiMetaData table.",
+							"type": "SynapseNotebook",
+							"dependsOn": [
+								{
+									"activity": "Execute Transformation",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.00:30:00",
+								"retry": 1,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"notebook": {
+									"referenceName": "publishing_runner",
+									"type": "NotebookReference"
+								},
+								"parameters": {
+									"data_type": {
+										"value": {
+											"value": "@{item().RowKey}",
+											"type": "Expression"
+										},
+										"type": "string"
+									},
+									"run_id": {
+										"value": {
+											"value": "@pipeline().RunId",
+											"type": "Expression"
+										},
+										"type": "string"
+									},
+									"run_execution_time": {
+										"value": {
+											"value": "@variables('Execution_Time')",
+											"type": "Expression"
+										},
+										"type": "string"
+									}
+								},
+								"snapshot": true,
+								"sparkPool": {
+									"referenceName": "cartierpoolv34",
+									"type": "BigDataPoolReference"
+								},
+								"executorSize": "Medium",
+								"conf": {
+									"spark.dynamicAllocation.enabled": null,
+									"spark.dynamicAllocation.minExecutors": null,
+									"spark.dynamicAllocation.maxExecutors": null
+								},
+								"driverSize": "Medium",
+								"numExecutors": null
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Set ExecutionTime",
+				"description": "Sets pipeline variable, ExecutionTime, which is leveraged as timestamp marker for processing notebooks. ",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "Execution_Time",
+					"value": {
+						"value": "@formatDateTime(convertTimeZone(utcnow(), 'UTC', 'Pacific Standard Time'), 'yyyy-MM-ddTHH:mm:ss.ffffffZ')",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Check If should publish Delta",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "ForEach API",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@equals(pipeline().parameters.publishDeltaToHRDL, true)",
+						"type": "Expression"
+					},
+					"ifTrueActivities": [
+						{
+							"name": "Execute Publish_HRDL_Delta_Child",
+							"description": "Calls the Publish_HRDL_Entities_Parent pipeline to publish delta files.",
+							"type": "ExecutePipeline",
+							"dependsOn": [],
+							"policy": {
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "Publish_HRDL_Entities_Parent",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"JobType": "Delta"
+								}
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"publishDeltaToHRDL": {
+				"type": "bool",
+				"defaultValue": true
+			}
+		},
+		"variables": {
+			"Execution_Time": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "WFS"
+		},
+		"annotations": []
+	}
+}

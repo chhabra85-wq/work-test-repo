@@ -1,0 +1,33 @@
+{
+	"name": "CartierTableStorage",
+	"properties": {
+		"description": "Generic table storage dataset pointing to the team's internal cartier azure table storage account. Expects parameters: StorageAccountName & TableName. ",
+		"linkedServiceName": {
+			"referenceName": "CartierTableStorage",
+			"type": "LinkedServiceReference",
+			"parameters": {
+				"storageAccountName": {
+					"value": "@dataset().StorageAccountName",
+					"type": "Expression"
+				}
+			}
+		},
+		"parameters": {
+			"StorageAccountName": {
+				"type": "string"
+			},
+			"TableName": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "AzureTable",
+		"schema": [],
+		"typeProperties": {
+			"tableName": {
+				"value": "@dataset().TableName",
+				"type": "Expression"
+			}
+		}
+	}
+}

@@ -1,0 +1,25 @@
+{
+	"name": "ELT WFS data to local storage and publish delta files to HRDL",
+	"properties": {
+		"description": "This trigger is linked to the pipeline that extracts data from WFS APIs to local storage, processes the data and prepares full & delta files to be published to HRDL. A parameter of the pipeline controls whether or not delta files have to be published to HR Data Lake.",
+		"annotations": [],
+		"runtimeState": "Started",
+		"pipelines": [
+			{
+				"pipelineReference": {
+					"referenceName": "Pull_WFS_Data_Parent",
+					"type": "PipelineReference"
+				}
+			}
+		],
+		"type": "ScheduleTrigger",
+		"typeProperties": {
+			"recurrence": {
+				"frequency": "Minute",
+				"interval": 30,
+				"startTime": "2024-06-13T06:15:00",
+				"timeZone": "Pacific Standard Time"
+			}
+		}
+	}
+}

@@ -1,0 +1,168 @@
+{
+	"name": "generate_auth_token",
+	"properties": {
+		"folder": {
+			"name": "ingestion/utilities"
+		},
+		"nbformat": 4,
+		"nbformat_minor": 2,
+		"bigDataPool": {
+			"referenceName": "devpoolv34",
+			"type": "BigDataPoolReference"
+		},
+		"sessionProperties": {
+			"driverMemory": "112g",
+			"driverCores": 16,
+			"executorMemory": "112g",
+			"executorCores": 16,
+			"numExecutors": 2,
+			"conf": {
+				"spark.dynamicAllocation.enabled": "false",
+				"spark.dynamicAllocation.minExecutors": "2",
+				"spark.dynamicAllocation.maxExecutors": "2",
+				"spark.autotune.trackingId": "799977e4-0b9c-4292-a774-220f714d8092"
+			}
+		},
+		"metadata": {
+			"saveOutput": true,
+			"enableDebugMode": true,
+			"kernelspec": {
+				"name": "synapse_pyspark",
+				"display_name": "Synapse PySpark"
+			},
+			"language_info": {
+				"name": "python"
+			},
+			"a365ComputeOptions": {
+				"id": "/subscriptions/f8a339ea-4445-4d69-a4bb-b7c77c9db241/resourceGroups/RG-Cartier-Dev/providers/Microsoft.Synapse/workspaces/synw-time-cartier-dev/bigDataPools/devpool",
+				"name": "devpoolv34",
+				"type": "Spark",
+				"endpoint": "https://synw-time-cartier-dev.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/devpool",
+				"auth": {
+					"type": "AAD",
+					"authResource": "https://dev.azuresynapse.net"
+				},
+				"sparkVersion": "3.3",
+				"nodeCount": 10,
+				"cores": 16,
+				"memory": 112,
+				"automaticScaleJobs": false
+			},
+			"sessionKeepAliveTimeout": 30
+		},
+		"cells": [
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"# Fetches an authentication token from an endpoint using the specified credentials."
+				]
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"from requests.exceptions import RequestException\r\n",
+					"from datetime import datetime, timedelta\r\n",
+					"import requests\r\n",
+					"import time\r\n",
+					"from typing import Iterator\r\n",
+					"\r\n",
+					"class TokenAuthenticator:\r\n",
+					"    \"\"\"\r\n",
+					"    A class that handles the authentication token for a given auth endpoint.\r\n",
+					"    \r\n",
+					"    \"\"\"\r\n",
+					"    DEFAULT_TIMEOUT = 5\r\n",
+					"    REFRESH_INTERVAL_SECONDS = 250\r\n",
+					"    MAX_RETRIES = 5\r\n",
+					"\r\n",
+					"    # Initializes the TokenAuthenticator with the provided auth endpoint\r\n",
+					"    def __init__(self, auth_endpoint: str, client_id: str, client_secret: str, telemetry_client):\r\n",
+					"        self.auth_endpoint = auth_endpoint\r\n",
+					"        self.client_id = client_id\r\n",
+					"        self.client_secret = client_secret\r\n",
+					"        self.telemetry_client = telemetry_client\r\n",
+					"        self.session = requests.Session()\r\n",
+					"        self.headers = {\r\n",
+					"            \"Content-Type\": \"application/json\"\r\n",
+					"        }\r\n",
+					"        self.params = {\r\n",
+					"            \"client_id\": self.client_id,\r\n",
+					"            \"client_secret\": self.client_secret\r\n",
+					"        }\r\n",
+					"        self.token = None\r\n",
+					"        self.expiry_timestamp = None\r\n",
+					"        self.num_retries = 0\r\n",
+					"\r\n",
+					"    # Private Method that refreshes the token by sending a POST request to the auth endpoint and obtaining a new token if the current one has expired or is invalid\r\n",
+					"    def _refresh_token(self) -> str:\r\n",
+					"        try:\r\n",
+					"            response = self.session.post(self.auth_endpoint, headers=self.headers, params=self.params, timeout=self.DEFAULT_TIMEOUT)\r\n",
+					"            self.telemetry_client.track_event(f\"WFS Auth API response headers: {response.headers}\")\r\n",
+					"            self.telemetry_client.track_event(f\"WFS Auth API returned a {response.status_code} status code.\")\r\n",
+					"            \r\n",
+					"            response.raise_for_status()\r\n",
+					"            self.token = response.json().get(\"access_token\")\r\n",
+					"            if self.token:\r\n",
+					"                self.expiry_timestamp = datetime.now() + timedelta(seconds=int(response.json().get(\"expires_in\", 0)))\r\n",
+					"                return self.token\r\n",
+					"            else:\r\n",
+					"                #If the response from the auth endpoint doesn't contain an \"access_token\" field.\r\n",
+					"                raise ValueError(\"Response does not contain access_token field.\")\r\n",
+					"\r\n",
+					"        # If there's an error when sending the POST request to the auth endpoint\r\n",
+					"        except RequestException as e:\r\n",
+					"            self.num_retries += 1\r\n",
+					"\r\n",
+					"            if self.num_retries <= self.MAX_RETRIES:\r\n",
+					"                self.telemetry_client.track_exception(f\"Error fetching token {self.num_retries}: {e}\")\r\n",
+					"                time.sleep(self.REFRESH_INTERVAL_SECONDS)\r\n",
+					"                return self._refresh_token()\r\n",
+					"            else:\r\n",
+					"                # If the maximum number of retries is reached when fetching the token.\r\n",
+					"                self.telemetry_client.track_exception(f\"Error fetching token {self.num_retries}: {e}\")\r\n",
+					"                raise RuntimeError(\"Maximum number of retries reached, giving up.\")\r\n",
+					"        except json.decoder.JSONDecodeError as e:\r\n",
+					"            self.telemetry_client.track_exception(f\"Error decoding response json {str(e)}\")\r\n",
+					"            time.sleep(self.REFRESH_INTERVAL_SECONDS)\r\n",
+					"            return self._refresh_token()\r\n",
+					"            \r\n",
+					"    # Public method that returns the token. If the token is None or has expired, this method calls the _refresh_token method to obtain a new token.\r\n",
+					"    def get_auth_token(self) -> str:\r\n",
+					"        if self.token is None or self.expiry_timestamp is None or datetime.now() >= self.expiry_timestamp:\r\n",
+					"            self._refresh_token()\r\n",
+					"        return self.token\r\n",
+					"    \r\n",
+					"    def _token_generator(self) -> Iterator[str]:\r\n",
+					"        while True:\r\n",
+					"            yield self.get_auth_token()\r\n",
+					"\r\n",
+					"    def get_auth_token_iterator(self) -> Iterator[str]:\r\n",
+					"        if self.token is None or self.expiry_timestamp is None or datetime.now() >= self.expiry_timestamp:\r\n",
+					"            self._refresh_token()\r\n",
+					"\r\n",
+					"        return self._token_generator()    \r\n",
+					""
+				],
+				"execution_count": 8
+			}
+		]
+	}
+}

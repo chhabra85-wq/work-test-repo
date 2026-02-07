@@ -1,0 +1,33 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "azRegion": {
+            "value": null
+        },
+        "resourceGroupName": {
+            "value": null
+        },
+        "appInsightsName": {
+            "value": "cartierAI"
+        },
+        "datalakeStorageFilesystem": {
+            "value": "cartier"
+        },
+        "keyVaultname": {
+            "value": "Time-Cartier-KV"
+        },
+        "logAnalyticsName": {
+            "value": "log-analytics-cartier"
+        },
+        "storageAccountName": {
+            "value": "strcartier"
+        },
+        "synapseWorkspaceName": {
+            "value": "synw-time-cartier"
+        },
+        "tenantId": {
+            "value": null
+        }
+    }
+}

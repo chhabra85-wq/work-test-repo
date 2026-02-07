@@ -1,0 +1,24 @@
+{
+	"$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"workspaceName": {
+			"value": "synw-time-cartier-dev"
+		},
+		"CartierTableStorage_connectionString": {
+			"value": "DefaultEndpointsProtocol=https;AccountName=@{linkedService().storageAccountName};"
+		},
+		"synw-time-cartier-dev-WorkspaceDefaultSqlServer_connectionString": {
+			"value": "Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=tcp:synw-time-cartier-dev.sql.azuresynapse.net,1433;Initial Catalog=@{linkedService().DBName}"
+		},
+		"CartierBlobStorage_properties_typeProperties_serviceEndpoint": {
+			"value": "https://strcartierdev.blob.core.windows.net"
+		},
+		"CartierKeyVault_properties_typeProperties_baseUrl": {
+			"value": "https://time-cartier-devkv.vault.azure.net/"
+		},
+		"synw-time-cartier-dev-WorkspaceDefaultStorage_properties_typeProperties_url": {
+			"value": "https://strcartierdev.dfs.core.windows.net"
+		}
+	}
+}

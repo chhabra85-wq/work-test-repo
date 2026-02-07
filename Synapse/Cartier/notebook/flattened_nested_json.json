@@ -1,0 +1,141 @@
+{
+	"name": "flattened_nested_json",
+	"properties": {
+		"folder": {
+			"name": "ingestion/utilities"
+		},
+		"nbformat": 4,
+		"nbformat_minor": 2,
+		"bigDataPool": {
+			"referenceName": "devpoolv34",
+			"type": "BigDataPoolReference"
+		},
+		"sessionProperties": {
+			"driverMemory": "112g",
+			"driverCores": 16,
+			"executorMemory": "112g",
+			"executorCores": 16,
+			"numExecutors": 2,
+			"conf": {
+				"spark.dynamicAllocation.enabled": "false",
+				"spark.dynamicAllocation.minExecutors": "2",
+				"spark.dynamicAllocation.maxExecutors": "2",
+				"spark.autotune.trackingId": "1321a589-7eae-4a94-b23c-aaeb3cb67368"
+			}
+		},
+		"metadata": {
+			"saveOutput": true,
+			"enableDebugMode": true,
+			"kernelspec": {
+				"name": "synapse_pyspark",
+				"display_name": "Synapse PySpark"
+			},
+			"language_info": {
+				"name": "python"
+			},
+			"a365ComputeOptions": {
+				"id": "/subscriptions/f8a339ea-4445-4d69-a4bb-b7c77c9db241/resourceGroups/RG-Cartier-Dev/providers/Microsoft.Synapse/workspaces/synw-time-cartier-dev/bigDataPools/devpool",
+				"name": "devpoolv34",
+				"type": "Spark",
+				"endpoint": "https://synw-time-cartier-dev.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/devpool",
+				"auth": {
+					"type": "AAD",
+					"authResource": "https://dev.azuresynapse.net"
+				},
+				"sparkVersion": "3.3",
+				"nodeCount": 10,
+				"cores": 16,
+				"memory": 112,
+				"automaticScaleJobs": false
+			},
+			"sessionKeepAliveTimeout": 30
+		},
+		"cells": [
+			{
+				"cell_type": "code",
+				"source": [
+					"from pyspark.sql.types import StructType, StructField, StringType, IntegerType, LongType, ArrayType, MapType\r\n",
+					"from pyspark.sql.functions import explode_outer\r\n",
+					"from pyspark.sql.functions import col\r\n",
+					"\r\n",
+					"class FlattenNestedJson:\r\n",
+					"    def __init__(self, delimiter=\"_\"):\r\n",
+					"        self.delimiter = delimiter\r\n",
+					"        self.complex_fields = {}\r\n",
+					"\r\n",
+					"    def flatten_df(self, df):\r\n",
+					"        \"\"\"\r\n",
+					"        Given a DataFrame with nested JSON columns, this function flattens all the\r\n",
+					"        nested columns and returns a new DataFrame with a flat structure, which makes\r\n",
+					"        it easier to process and analyze using other PySpark functions.\r\n",
+					"\r\n",
+					"        Arguments:\r\n",
+					"            df (pyspark.sql.DataFrame): The DataFrame to flatten.\r\n",
+					"\r\n",
+					"        Returns:\r\n",
+					"            pyspark.sql.DataFrame: A new DataFrame with a flat structure.\r\n",
+					"        \"\"\"\r\n",
+					"        try:\r\n",
+					"            self.complex_fields = {\r\n",
+					"                    field.name: field.dataType\r\n",
+					"                    for field in df.schema.fields\r\n",
+					"                    if isinstance(field.dataType, (ArrayType, StructType, MapType))\r\n",
+					"                }\r\n",
+					"\r\n",
+					"            while self.complex_fields:\r\n",
+					"                field_name = list(self.complex_fields.keys())[0]\r\n",
+					"                print (\"Processing :\"+field_name+\" Type : \"+str(isinstance(self.complex_fields[field_name], (ArrayType, StructType, MapType))))\r\n",
+					"\r\n",
+					"                # If the field is a struct, it expands all nested elements to columns in a flattened view.\r\n",
+					"                if isinstance(self.complex_fields[field_name], StructType):\r\n",
+					"                    expanded = [\r\n",
+					"                        col(field_name + \".\" + subfield.name).alias(field_name + self.delimiter + subfield.name)\r\n",
+					"                        for subfield in self.complex_fields[field_name]\r\n",
+					"                    ]\r\n",
+					"                    df = df.select(\"*\", *expanded).drop(field_name)\r\n",
+					"\r\n",
+					"                # If the field is an array, it adds the array elements as rows using the explode_outer function.\r\n",
+					"                # i.e. explode_outer Arrays\r\n",
+					"                elif isinstance(self.complex_fields[field_name], ArrayType):\r\n",
+					"                    df = df.withColumn(field_name, explode_outer(field_name))\r\n",
+					"\r\n",
+					"                # If the field is a map, it converts all nested elements to columns in a flattened view.\r\n",
+					"                elif isinstance(self.complex_fields[field_name], MapType):\r\n",
+					"                    keys_df = df.select(explode_outer(map_keys(col(field_name)))).distinct()\r\n",
+					"                    keys = list(map(lambda row: row[0], keys_df.collect()))\r\n",
+					"                    key_cols = list(\r\n",
+					"                        map(\r\n",
+					"                            lambda f: col(field_name).getItem(f).alias(str(field_name + self.delimiter + f)),\r\n",
+					"                            keys,\r\n",
+					"                        )\r\n",
+					"                    )\r\n",
+					"                    drop_column_list = [field_name]\r\n",
+					"                    df = df.select(\r\n",
+					"                        [\r\n",
+					"                            col_name\r\n",
+					"                            for col_name in df.columns\r\n",
+					"                            if col_name not in drop_column_list\r\n",
+					"                        ]\r\n",
+					"                        + key_cols\r\n",
+					"                    )\r\n",
+					"\r\n",
+					"                # The function repeats this process until all complex fields in the schema have been flattened. \r\n",
+					"                # The resulting DataFrame has a flat structure, which makes it easier to process and analyze using other PySpark functions.\r\n",
+					"                self.complex_fields = {\r\n",
+					"                            field.name: field.dataType\r\n",
+					"                            for field in df.schema.fields\r\n",
+					"                            if isinstance(field.dataType, (ArrayType, StructType, MapType))\r\n",
+					"                        }\r\n",
+					"\r\n",
+					"            return df\r\n",
+					"\r\n",
+					"        except Exception as e:\r\n",
+					"            telemetry_client.track_exception(f\"An error occurred while flattening the nested JSON:, {str(e)}\")\r\n",
+					"            return None\r\n",
+					""
+				],
+				"execution_count": 1
+			}
+		]
+	}
+}

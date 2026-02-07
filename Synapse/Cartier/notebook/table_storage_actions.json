@@ -1,0 +1,101 @@
+{
+	"name": "table_storage_actions",
+	"properties": {
+		"folder": {
+			"name": "ingestion/utilities"
+		},
+		"nbformat": 4,
+		"nbformat_minor": 2,
+		"bigDataPool": {
+			"referenceName": "devpoolv34",
+			"type": "BigDataPoolReference"
+		},
+		"sessionProperties": {
+			"driverMemory": "112g",
+			"driverCores": 16,
+			"executorMemory": "112g",
+			"executorCores": 16,
+			"numExecutors": 2,
+			"conf": {
+				"spark.dynamicAllocation.enabled": "false",
+				"spark.dynamicAllocation.minExecutors": "2",
+				"spark.dynamicAllocation.maxExecutors": "2",
+				"spark.autotune.trackingId": "08775a4f-749d-461d-9018-a2d3c1116299"
+			}
+		},
+		"metadata": {
+			"saveOutput": true,
+			"enableDebugMode": true,
+			"kernelspec": {
+				"name": "synapse_pyspark",
+				"display_name": "Synapse PySpark"
+			},
+			"language_info": {
+				"name": "python"
+			},
+			"a365ComputeOptions": {
+				"id": "/subscriptions/f8a339ea-4445-4d69-a4bb-b7c77c9db241/resourceGroups/RG-Cartier-Dev/providers/Microsoft.Synapse/workspaces/synw-time-cartier-dev/bigDataPools/devpool",
+				"name": "devpoolv34",
+				"type": "Spark",
+				"endpoint": "https://synw-time-cartier-dev.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/devpool",
+				"auth": {
+					"type": "AAD",
+					"authResource": "https://dev.azuresynapse.net"
+				},
+				"sparkVersion": "3.3",
+				"nodeCount": 10,
+				"cores": 16,
+				"memory": 112,
+				"automaticScaleJobs": false
+			},
+			"sessionKeepAliveTimeout": 30
+		},
+		"cells": [
+			{
+				"cell_type": "code",
+				"source": [
+					"from typing import Optional, Dict\r\n",
+					"\r\n",
+					"class AzureTableActions:\r\n",
+					"    def __init__(self, table_service_client: AzureTableClient, telemetry_client: TelemetryClient, params: str):\r\n",
+					"        self.table_service_client = table_service_client\r\n",
+					"        self.telemetry_client = telemetry_client\r\n",
+					"        self.api_name = params.get(\"api_name\")\r\n",
+					"\r\n",
+					"    def write_to_api_call_history_log_table(self, response_status, records_returned, current_cursor, next_cursor):\r\n",
+					"        \"\"\"\r\n",
+					"        Writes the API call history log to an Azure Table.\r\n",
+					"\r\n",
+					"        Args:\r\n",
+					"            response_status (int): The HTTP response status code.\r\n",
+					"            records_returned (int): The number of records returned by the API.\r\n",
+					"            current_cursor (str or None): The cursor value that was used to fetch the current set of records. \r\n",
+					"                                        None if cursor is not applicable.\r\n",
+					"            next_cursor (str or None): The cursor value that should be used to fetch the next set of records.\r\n",
+					"                                    None if cursor is not applicable.\r\n",
+					"\r\n",
+					"        Returns:\r\n",
+					"            None.\r\n",
+					"        \"\"\"    \r\n",
+					"        try:\r\n",
+					"            time_stamp = datetime.utcnow()\r\n",
+					"            # Create a new entity and set its properties\r\n",
+					"            new_entity = {\r\n",
+					"                \"PartitionKey\": self.api_name,\r\n",
+					"                \"RowKey\": str(time_stamp),\r\n",
+					"                \"ResponseStatus\": response_status,\r\n",
+					"                \"RecordsReturned\": records_returned,\r\n",
+					"                \"CurrentCursor\": current_cursor,\r\n",
+					"                \"NextCursor\": next_cursor\r\n",
+					"            }\r\n",
+					"            # Insert or replace the entity in the table\r\n",
+					"            created_entity = self.table_service_client.create_entity(\"ApiCallHistoryLog\", entity=new_entity)\r\n",
+					"        except Exception as e:\r\n",
+					"            self.telemetry_client.track_exception(Exception(f\"An error occurred while writing to the API call history log table: {e}\"))\r\n",
+					""
+				],
+				"execution_count": null
+			}
+		]
+	}
+}

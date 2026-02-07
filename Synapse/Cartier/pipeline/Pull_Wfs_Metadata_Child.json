@@ -1,0 +1,299 @@
+{
+	"name": "Pull_Wfs_Metadata_Child",
+	"properties": {
+		"activities": [
+			{
+				"name": "Set PipelineRunTime",
+				"description": "Keeps the timestamp to be consistent for the entire pipeline run",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "PipelineRunTime",
+					"value": {
+						"value": "@{formatDateTime(convertTimeZone(utcnow(), 'UTC', 'Pacific Standard Time'), 'yyyyMMddHHmm')}",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Check File Exist",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Set Expected Files",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@variables('ExpectedFiles')",
+						"type": "Expression"
+					},
+					"isSequential": false,
+					"activities": [
+						{
+							"name": "Get WFS Metadata",
+							"description": "Return a list of file names from WFS SFTP location.",
+							"type": "GetMetadata",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"dataset": {
+									"referenceName": "WfsSftp",
+									"type": "DatasetReference",
+									"parameters": {
+										"FileName": {
+											"value": "@item()",
+											"type": "Expression"
+										}
+									}
+								},
+								"fieldList": [
+									"exists"
+								],
+								"storeSettings": {
+									"type": "SftpReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false,
+									"disableChunking": false
+								},
+								"formatSettings": {
+									"type": "DelimitedTextReadSettings"
+								}
+							}
+						},
+						{
+							"name": "If File Exists",
+							"type": "IfCondition",
+							"dependsOn": [
+								{
+									"activity": "Get WFS Metadata",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"expression": {
+									"value": "@equals(activity('Get WFS Metadata').output.exists, true)",
+									"type": "Expression"
+								},
+								"ifFalseActivities": [
+									{
+										"name": "Append File Missing List",
+										"type": "AppendVariable",
+										"dependsOn": [],
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "MissingFiles",
+											"value": {
+												"value": "@item()",
+												"type": "Expression"
+											}
+										}
+									}
+								],
+								"ifTrueActivities": [
+									{
+										"name": "Execute WFS Metadata File",
+										"type": "ExecutePipeline",
+										"dependsOn": [
+											{
+												"activity": "Append File To Existing List",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"userProperties": [],
+										"typeProperties": {
+											"pipeline": {
+												"referenceName": "Pull_Wfs_Metadata_Inner_Child",
+												"type": "PipelineReference"
+											},
+											"waitOnCompletion": true,
+											"parameters": {
+												"FileName": {
+													"value": "@item()",
+													"type": "Expression"
+												},
+												"PipelineRunTime": {
+													"value": "@variables('PipelineRunTime')",
+													"type": "Expression"
+												}
+											}
+										}
+									},
+									{
+										"name": "Append File To Existing List",
+										"type": "AppendVariable",
+										"dependsOn": [],
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "ExistingFiles",
+											"value": {
+												"value": "@item()",
+												"type": "Expression"
+											}
+										}
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Files Existing",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "Check File Exist",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@greater( length(variables('ExistingFiles')) , 0 )",
+						"type": "Expression"
+					},
+					"ifTrueActivities": [
+						{
+							"name": "Execute Publish HRDL Entities Parent",
+							"description": "Call the Publish parent with Metadata Type as JobType, when some metadata files are presented.",
+							"type": "ExecutePipeline",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "Publish_HRDL_Entities_Parent",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"JobType": "Metadata"
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Files Missing",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "Files Existing",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@greater( length(variables('MissingFiles')) , 0 )",
+						"type": "Expression"
+					},
+					"ifTrueActivities": [
+						{
+							"name": "ICMConnectorFunction",
+							"type": "AzureFunctionActivity",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"functionName": "icmConnector",
+								"method": "POST",
+								"body": {
+									"value": "{\nTitle: \"Synapse Analytics pipeline missing metadata files from WFS: @{pipeline().Pipeline} in @{pipeline().DataFactory}\",\nDescriptionText: \"<br><u><b><h3>@{pipeline().Pipeline} in @{pipeline().DataFactory} did not find metadata files on WFS SFTP.</h3></b></u><b>Current pipeline Run ID: </b>@{pipeline().RunId}<br><br><b>About this pipeline: </b>This pipeline is a part of orchestration that fetches metadata files from WFS's SFTP location, processes them and publishes them to HR Data Lake. <br><br><b>Cause of failure: </b> Pipeline identified that the below list of file(s) are missing on WFS SFTP location : @{string(join(variables('MissingFiles'), ','))}<br><br><b>Impact of this failure: </b>One or more metadata files will not get published to HR Data Lake. Any new paytypes added on WFS since the last publication time will not be available to consumers.<br><br><b>Steps to recover from failure: </b> Please engage system integration team of WFS, asking them to run the custom export job to generate these missing file(s). Run a new instance of this pipeline once team confirms that missing metadata file(s) are available on WFS's SFTP location. The re-run option will expect parameter of an array with file names. Pass in the name of the file(s) like this: [\\\"@{string(join(variables('MissingFiles'), '\\\",\\\"'))}\\\"]. <b>Note:</b> If DRI re-run this pipeline without pass in parameter for the expected file(s), this pipeline will expect four original files and will triger Icm tickets for the remaining files. In this case, just link the Icm tickets with this incidence.<br><br><b>Contacts to notify if this results in stale HR DL data: </b><a href mailto:tr01subscribers@microsoft.com>TR01Subscribers@microsoft.com</a><br>\",\nSeverity: \"4\"\n}",
+									"type": "Expression"
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "ICMConnector",
+								"type": "LinkedServiceReference"
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Set Expected Files",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Set PipelineRunTime",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "ExpectedFiles",
+					"value": {
+						"value": "@pipeline().parameters.ExpectedFiles",
+						"type": "Expression"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"ExpectedFiles": {
+				"type": "array",
+				"defaultValue": []
+			}
+		},
+		"variables": {
+			"PipelineRunTime": {
+				"type": "String"
+			},
+			"ExpectedFiles": {
+				"type": "Array",
+				"defaultValue": []
+			},
+			"MissingFiles": {
+				"type": "Array",
+				"defaultValue": []
+			},
+			"ExistingFiles": {
+				"type": "Array",
+				"defaultValue": []
+			}
+		},
+		"folder": {
+			"name": "WFS"
+		},
+		"annotations": []
+	}
+}

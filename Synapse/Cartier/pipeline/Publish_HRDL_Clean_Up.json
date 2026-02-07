@@ -1,0 +1,157 @@
+{
+	"name": "Publish_HRDL_Clean_Up",
+	"properties": {
+		"description": "Pipeline focused on cleaning up HRDL file folders.",
+		"activities": [
+			{
+				"name": "FetchRecordsToDelete",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.00:10:00",
+					"retry": 1,
+					"retryIntervalInSeconds": 60,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureTableSource",
+						"azureTableSourceQuery": {
+							"value": "IsDeleted eq false and PartitionKey eq '@{pipeline().parameters.FileType}' and RowKey lt '@{formatDateTime(addHours(utcNow(), pipeline().parameters.ThresholdInHours), 'yyyy-MM-ddTHH:mm:ss.fffffffK')}'",
+							"type": "Expression"
+						},
+						"azureTableSourceIgnoreTableNotFound": false
+					},
+					"dataset": {
+						"referenceName": "CartierTableStorage",
+						"type": "DatasetReference",
+						"parameters": {
+							"StorageAccountName": "strcartierdev",
+							"TableName": "HRDLCleanUpRecords"
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "Delete Each folder older than threashold",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "FetchRecordsToDelete",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('FetchRecordsToDelete').output.value",
+						"type": "Expression"
+					},
+					"activities": [
+						{
+							"name": "Delete files older than threshold",
+							"type": "Delete",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.00:10:00",
+								"retry": 1,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"dataset": {
+									"referenceName": "HRDLParquet",
+									"type": "DatasetReference",
+									"parameters": {
+										"FileSystem": {
+											"value": "@{item().PublishFolder}",
+											"type": "Expression"
+										},
+										"Directory": {
+											"value": "@{item().FolderName}",
+											"type": "Expression"
+										},
+										"FileName": {
+											"value": "@coalesce(null)",
+											"type": "Expression"
+										}
+									}
+								},
+								"enableLogging": false,
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								}
+							}
+						},
+						{
+							"name": "Mark Entry as deleted",
+							"description": "Perform soft delete on HRDLCleanUpRecords table entry",
+							"type": "WebActivity",
+							"dependsOn": [
+								{
+									"activity": "Delete files older than threshold",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.00:10:00",
+								"retry": 1,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"url": {
+									"value": "https://strcartierdev.table.core.windows.net/HRDLCleanUpRecords(PartitionKey='@{item().PartitionKey}',RowKey='@{formatDateTime(item().RowKey, 'yyyy-MM-ddTHH:mm:ss.fffffffK')}')",
+									"type": "Expression"
+								},
+								"connectVia": {
+									"referenceName": "AutoResolveIntegrationRuntime",
+									"type": "IntegrationRuntimeReference"
+								},
+								"method": "PATCH",
+								"headers": {
+									"Content-Type": "application/json",
+									"x-ms-version": "2020-04-08",
+									"Accept": "application/json;odata=nometadata"
+								},
+								"body": {
+									"value": "{  \n   \"IsDeleted\":true\n}  ",
+									"type": "Expression"
+								},
+								"authentication": {
+									"type": "MSI",
+									"resource": "https://storage.azure.com/"
+								}
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"ThresholdInHours": {
+				"type": "int"
+			},
+			"FileType": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "WFS/Publish"
+		},
+		"annotations": []
+	}
+}

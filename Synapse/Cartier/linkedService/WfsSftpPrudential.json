@@ -1,0 +1,35 @@
+{
+	"name": "WfsSftpPrudential",
+	"properties": {
+		"description": "Linked Service to connect to WFS sftp with msftprudentialdevftp credentials.",
+		"annotations": [],
+		"type": "Sftp",
+		"typeProperties": {
+			"host": "interface.us.wfs.cloud",
+			"port": 22,
+			"skipHostKeyValidation": true,
+			"authenticationType": "SshPublicKey",
+			"userName": "msftprudentialdevftp",
+			"privateKeyContent": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "CartierKeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "WfsSftpPrudentialOpenSSHKey"
+			},
+			"passPhrase": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "CartierKeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "WfsSftpPrudentialOpenSSHKey-Passphrase"
+			}
+		},
+		"connectVia": {
+			"referenceName": "AutoResolveIntegrationRuntime",
+			"type": "IntegrationRuntimeReference"
+		}
+	}
+}

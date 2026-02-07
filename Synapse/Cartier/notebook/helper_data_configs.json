@@ -1,0 +1,124 @@
+{
+	"name": "helper_data_configs",
+	"properties": {
+		"folder": {
+			"name": "helpers"
+		},
+		"nbformat": 4,
+		"nbformat_minor": 2,
+		"bigDataPool": {
+			"referenceName": "devpoolv34",
+			"type": "BigDataPoolReference"
+		},
+		"sessionProperties": {
+			"driverMemory": "112g",
+			"driverCores": 16,
+			"executorMemory": "112g",
+			"executorCores": 16,
+			"numExecutors": 2,
+			"conf": {
+				"spark.dynamicAllocation.enabled": "false",
+				"spark.dynamicAllocation.minExecutors": "2",
+				"spark.dynamicAllocation.maxExecutors": "2",
+				"spark.autotune.trackingId": "dcb2da59-ebe6-40a0-88f5-b74ed729ce76"
+			}
+		},
+		"metadata": {
+			"saveOutput": true,
+			"enableDebugMode": true,
+			"kernelspec": {
+				"name": "synapse_pyspark",
+				"display_name": "Synapse PySpark"
+			},
+			"language_info": {
+				"name": "python"
+			},
+			"a365ComputeOptions": {
+				"id": "/subscriptions/f8a339ea-4445-4d69-a4bb-b7c77c9db241/resourceGroups/RG-Cartier-Dev/providers/Microsoft.Synapse/workspaces/synw-time-cartier-dev/bigDataPools/devpool",
+				"name": "devpoolv34",
+				"type": "Spark",
+				"endpoint": "https://synw-time-cartier-dev.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/devpool",
+				"auth": {
+					"type": "AAD",
+					"authResource": "https://dev.azuresynapse.net"
+				},
+				"sparkVersion": "3.3",
+				"nodeCount": 10,
+				"cores": 16,
+				"memory": 112,
+				"automaticScaleJobs": false
+			},
+			"sessionKeepAliveTimeout": 30
+		},
+		"cells": [
+			{
+				"cell_type": "code",
+				"source": [
+					"import json\r\n",
+					"from pyspark.sql import DataFrame\r\n",
+					"from pyspark.sql.functions import col, lit\r\n",
+					"from pyspark.sql.types import StringType\r\n",
+					"\r\n",
+					"class DataConfigsHelper:\r\n",
+					"\r\n",
+					"    def __init__(self, data_configs: str, data_type: str):\r\n",
+					"        \"\"\"\r\n",
+					"        Initializes a DataConfigsHelper object for interacting with a Data Config.\r\n",
+					"\r\n",
+					"        Arguments:\r\n",
+					"            data_configs (str): Data config string to be parsed into json.\r\n",
+					"            data_type (str): Type of data config.\r\n",
+					"        Returns:\r\n",
+					"            None\r\n",
+					"        \"\"\"\r\n",
+					"        data_config_str = getattr(data_configs, data_type)\r\n",
+					"        self.data_config_json = json.loads(data_config_str)\r\n",
+					"\r\n",
+					"    def get_bronze_validation_df_rules_init_schema(self):\r\n",
+					"        return self.data_config_json[\"bronze\"][\"validationDataframeRules\"][\"initialSchema\"]\r\n",
+					"\r\n",
+					"    def get_bronze_validation_column_rules(self):\r\n",
+					"        return self.data_config_json[\"bronze\"][\"validationColumnRules\"]\r\n",
+					"\r\n",
+					"    def get_silver_finalized_schema(self):\r\n",
+					"        return self.data_config_json[\"silver\"][\"finalizedSchemaMapping\"]\r\n",
+					"\r\n",
+					"    def get_silver_validation_column_rules(self):\r\n",
+					"        return self.data_config_json[\"silver\"][\"validationColumnRules\"]\r\n",
+					"\r\n",
+					"    def get_silver_validation_df_rules_init_schema(self):\r\n",
+					"        return self.data_config_json[\"silver\"][\"validationDataframeRules\"][\"initialSchema\"]\r\n",
+					"\r\n",
+					"    def get_gold_finalized_schema(self):\r\n",
+					"        return self.data_config_json[\"gold\"][\"finalizedSchemaMapping\"]\r\n",
+					"\r\n",
+					"    def get_gold_validation_df_rules_init_schema(self):\r\n",
+					"        return self.data_config_json[\"gold\"][\"validationDataframeRules\"][\"initialSchema\"]\r\n",
+					"\r\n",
+					"    def get_gold_validation_column_rules(self):\r\n",
+					"        return self.data_config_json[\"gold\"][\"validationColumnRules\"]\r\n",
+					"\r\n",
+					"    def get_data_primary_key(self):\r\n",
+					"        return self.data_config_json[\"primaryKeyExpr\"]\r\n",
+					"\r\n",
+					"    def get_scientific_notation_conversion(self):\r\n",
+					"        return self.data_config_json[\"silver\"][\"scientificNotationConversionExpr\"]\r\n",
+					"   \r\n",
+					"    def get_time_off_data(self):\r\n",
+					"        return self.data_config_json[\"silver\"][\"transformations\"]\r\n",
+					"\r\n",
+					"    def update_df_column_names(self, existing_df: DataFrame, schema_dict: dict): \r\n",
+					"        new_columns = []\r\n",
+					"        for target_col_name, source_col_name in schema_dict.items():\r\n",
+					"            if source_col_name in existing_df.columns:\r\n",
+					"                new_columns.append(col(source_col_name).alias(target_col_name))\r\n",
+					"            else:\r\n",
+					"                new_columns.append(lit(None).cast(StringType()).alias(target_col_name))\r\n",
+					"        return existing_df.select(*new_columns)\r\n",
+					""
+				],
+				"execution_count": 2
+			}
+		]
+	}
+}

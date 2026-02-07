@@ -1,0 +1,121 @@
+{
+	"name": "helper_data_lake_client",
+	"properties": {
+		"folder": {
+			"name": "helpers"
+		},
+		"nbformat": 4,
+		"nbformat_minor": 2,
+		"bigDataPool": {
+			"referenceName": "devpoolv34",
+			"type": "BigDataPoolReference"
+		},
+		"sessionProperties": {
+			"driverMemory": "112g",
+			"driverCores": 16,
+			"executorMemory": "112g",
+			"executorCores": 16,
+			"numExecutors": 2,
+			"conf": {
+				"spark.dynamicAllocation.enabled": "false",
+				"spark.dynamicAllocation.minExecutors": "2",
+				"spark.dynamicAllocation.maxExecutors": "2",
+				"spark.autotune.trackingId": "3552db6e-7fa1-4b66-af0d-a7d070d44e04"
+			}
+		},
+		"metadata": {
+			"saveOutput": true,
+			"enableDebugMode": true,
+			"kernelspec": {
+				"name": "synapse_pyspark",
+				"display_name": "Synapse PySpark"
+			},
+			"language_info": {
+				"name": "python"
+			},
+			"a365ComputeOptions": {
+				"id": "/subscriptions/f8a339ea-4445-4d69-a4bb-b7c77c9db241/resourceGroups/RG-Cartier-Dev/providers/Microsoft.Synapse/workspaces/synw-time-cartier-dev/bigDataPools/devpoolv34",
+				"name": "devpoolv34",
+				"type": "Spark",
+				"endpoint": "https://synw-time-cartier-dev.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/devpoolv34",
+				"auth": {
+					"type": "AAD",
+					"authResource": "https://dev.azuresynapse.net"
+				},
+				"sparkVersion": "3.4",
+				"nodeCount": 3,
+				"cores": 8,
+				"memory": 56,
+				"automaticScaleJobs": false
+			},
+			"sessionKeepAliveTimeout": 30
+		},
+		"cells": [
+			{
+				"cell_type": "code",
+				"source": [
+					"from pyspark.sql import SparkSession\r\n",
+					"from typing import Optional\r\n",
+					"\r\n",
+					"class DataLakeClient:\r\n",
+					"    def __init__(self, linked_service_name: Optional[str], storage_account_name: str, spark: SparkSession):\r\n",
+					"        \"\"\"\r\n",
+					"        Initializes a DatalakeClient object for interacting with Azure Data Lake Gen2.\r\n",
+					"\r\n",
+					"        Arguments:\r\n",
+					"            store_name (str): The name of the data store.\r\n",
+					"            linked_service (str, optional): The name of the linked service. Defaults to None.\r\n",
+					"        Returns:\r\n",
+					"            None\r\n",
+					"        \"\"\"\r\n",
+					"        self.linked_service_name = linked_service_name\r\n",
+					"        self.storage_account_name = storage_account_name\r\n",
+					"\r\n",
+					"        # Set up the Spark session\r\n",
+					"        self.spark = spark\r\n",
+					"        \r\n",
+					"        # Configure Spark for Synapse Analytics\r\n",
+					"        self.configure_spark()\r\n",
+					"        \r\n",
+					"    def configure_spark(self):\r\n",
+					"        self.spark.conf.set(f\"spark.storage.synapse.{self.storage_account_name}.linkedServiceName\", self.linked_service_name)\r\n",
+					"        self.spark.conf.set(f\"fs.azure.account.oauth.provider.type.{self.storage_account_name}\", \"com.microsoft.azure.synapse.tokenlibrary.LinkedServiceBasedTokenProvider\")\r\n",
+					"        \r\n",
+					"    def read_parquet(self, file_path):\r\n",
+					"        try:\r\n",
+					"            # Read from the Parquet file with schema merging enabled\r\n",
+					"            df = self.spark.read.option(\"mergeSchema\", \"true\").parquet(file_path)\r\n",
+					"            return df\r\n",
+					"        except Exception as e:\r\n",
+					"            raise ValueError(f\"Error reading data from {file_path}: {e}\")\r\n",
+					"    \r\n",
+					"    def write_parquet(self, df, output_path, mode=\"append\"):\r\n",
+					"        try:\r\n",
+					"            # Write to the Parquet file\r\n",
+					"            df.write.mode(mode).parquet(output_path)    \r\n",
+					"        except Exception as e:\r\n",
+					"            raise ValueError(f\"Error writing data to {output_path}: {e}\")\r\n",
+					"\r\n",
+					"    def write_generic_format(self, df, output_path, format_type, mode_type):\r\n",
+					"        \"\"\"\r\n",
+					"        Writes to set file format\r\n",
+					"\r\n",
+					"        Arguments:\r\n",
+					"            df (Dataframe): dataframe to write to format\r\n",
+					"            output_path (string): parth of desired file\r\n",
+					"            format_type (string): type of desired format\r\n",
+					"            mode_type (string): behavior type (overwrite or append)\r\n",
+					"        Returns:\r\n",
+					"            None\r\n",
+					"        \"\"\"                    \r\n",
+					"\r\n",
+					"        try:\r\n",
+					"            df.write.format(format_type).mode(mode_type).save(output_path)\r\n",
+					"        except Exception as e:\r\n",
+					"            raise ValueError(f\"Error writing data to {output_path}: {e}\")"
+				],
+				"execution_count": 2
+			}
+		]
+	}
+}

@@ -1,0 +1,104 @@
+{
+	"name": "helper_schema_transform",
+	"properties": {
+		"folder": {
+			"name": "helpers"
+		},
+		"nbformat": 4,
+		"nbformat_minor": 2,
+		"bigDataPool": {
+			"referenceName": "devpoolv34",
+			"type": "BigDataPoolReference"
+		},
+		"sessionProperties": {
+			"driverMemory": "112g",
+			"driverCores": 16,
+			"executorMemory": "112g",
+			"executorCores": 16,
+			"numExecutors": 2,
+			"conf": {
+				"spark.dynamicAllocation.enabled": "false",
+				"spark.dynamicAllocation.minExecutors": "2",
+				"spark.dynamicAllocation.maxExecutors": "2",
+				"spark.autotune.trackingId": "5434923e-3869-4a18-b98d-4c5208838f2b"
+			}
+		},
+		"metadata": {
+			"saveOutput": true,
+			"enableDebugMode": true,
+			"kernelspec": {
+				"name": "synapse_pyspark",
+				"display_name": "python"
+			},
+			"language_info": {
+				"name": "python"
+			},
+			"a365ComputeOptions": {
+				"id": "/subscriptions/f8a339ea-4445-4d69-a4bb-b7c77c9db241/resourceGroups/RG-Cartier-Dev/providers/Microsoft.Synapse/workspaces/synw-time-cartier-dev/bigDataPools/devpool",
+				"name": "devpoolv34",
+				"type": "Spark",
+				"endpoint": "https://synw-time-cartier-dev.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/devpool",
+				"auth": {
+					"type": "AAD",
+					"authResource": "https://dev.azuresynapse.net"
+				},
+				"sparkVersion": "3.3",
+				"nodeCount": 10,
+				"cores": 16,
+				"memory": 112,
+				"automaticScaleJobs": false
+			},
+			"sessionKeepAliveTimeout": 30
+		},
+		"cells": [
+			{
+				"cell_type": "code",
+				"source": [
+					"from pyspark.sql import SparkSession, DataFrame\r\n",
+					"from pyspark.sql.types import IntegerType, StructField\r\n",
+					"\r\n",
+					"class SchemaTransformer:\r\n",
+					"\r\n",
+					"    def zip_index_column(self, df: DataFrame, sequence_offset: int, columnName: str) -> DataFrame:\r\n",
+					"        \"\"\"\r\n",
+					"        Adds an index column to the DataFrame.\r\n",
+					"\r\n",
+					"        Args:\r\n",
+					"            df (DataFrame): The input DataFrame.\r\n",
+					"            sequence_offset (int): The offset value for the index.\r\n",
+					"            columnName (str): The name of the index column.\r\n",
+					"\r\n",
+					"        Returns:\r\n",
+					"            DataFrame: The DataFrame with the added index column.\r\n",
+					"        \"\"\"\r\n",
+					"        rdd = df.rdd.zipWithIndex().map(lambda row: (tuple(row[0]) + (row[1] + sequence_offset,)))\r\n",
+					"        schema = df.schema.add(StructField(columnName, IntegerType(), True))\r\n",
+					"        indexed_df = rdd.toDF(schema)\r\n",
+					"        return indexed_df\r\n",
+					"\r\n",
+					"    def add_index_column(self, df: DataFrame, sequence_offset: int, columnName: str) -> DataFrame:\r\n",
+					"\r\n",
+					"        # add the index column to the DataFrame\r\n",
+					"        indexed_df = self.zip_index_column(df, sequence_offset, columnName)\r\n",
+					"\r\n",
+					"        return indexed_df\r\n",
+					"\r\n",
+					"    def filter_on_gold_index_and_zip(self, df: DataFrame, sequence_offset: int, columnName: str) -> DataFrame:\r\n",
+					"        new_records_df = df.filter(col('gold_index') == -1) # new records\r\n",
+					"        new_records_df = new_records_df.drop(\"gold_index\")\r\n",
+					"        old_records_df = df.filter(col('gold_index') > -1) # old records\r\n",
+					"\r\n",
+					"        # add the index column to the DataFrame\r\n",
+					"        indexed_df = self.zip_index_column(new_records_df, sequence_offset, columnName)\r\n",
+					"\r\n",
+					"        # Add gold index based of filter and union both old and new index records\r\n",
+					"        final_df = old_records_df.unionByName(indexed_df)\r\n",
+					"\r\n",
+					"        return final_df\r\n",
+					"       "
+				],
+				"execution_count": null
+			}
+		]
+	}
+}

@@ -1,0 +1,286 @@
+{
+	"name": "ingestion_api_data_retriever_unit_tests",
+	"properties": {
+		"folder": {
+			"name": "tests/test_notebooks"
+		},
+		"nbformat": 4,
+		"nbformat_minor": 2,
+		"bigDataPool": {
+			"referenceName": "devpoolv34",
+			"type": "BigDataPoolReference"
+		},
+		"sessionProperties": {
+			"driverMemory": "112g",
+			"driverCores": 16,
+			"executorMemory": "112g",
+			"executorCores": 16,
+			"numExecutors": 2,
+			"conf": {
+				"spark.dynamicAllocation.enabled": "false",
+				"spark.dynamicAllocation.minExecutors": "2",
+				"spark.dynamicAllocation.maxExecutors": "2",
+				"spark.autotune.trackingId": "28248fd4-1924-4c7e-94b5-2cbc5735349d"
+			}
+		},
+		"metadata": {
+			"saveOutput": true,
+			"enableDebugMode": true,
+			"kernelspec": {
+				"name": "synapse_pyspark",
+				"display_name": "Synapse PySpark"
+			},
+			"language_info": {
+				"name": "python"
+			},
+			"a365ComputeOptions": {
+				"id": "/subscriptions/f8a339ea-4445-4d69-a4bb-b7c77c9db241/resourceGroups/RG-Cartier-Dev/providers/Microsoft.Synapse/workspaces/synw-time-cartier-dev/bigDataPools/devpool",
+				"name": "devpoolv34",
+				"type": "Spark",
+				"endpoint": "https://synw-time-cartier-dev.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/devpool",
+				"auth": {
+					"type": "AAD",
+					"authResource": "https://dev.azuresynapse.net"
+				},
+				"sparkVersion": "3.3",
+				"nodeCount": 10,
+				"cores": 16,
+				"memory": 112,
+				"automaticScaleJobs": false
+			},
+			"sessionKeepAliveTimeout": 30
+		},
+		"cells": [
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"%run helpers/helper_table_storage_client"
+				],
+				"execution_count": 1
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"%run ingestion/utilities/generate_auth_token"
+				],
+				"execution_count": null
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"%run ingestion/logics/ingestion_logic_api_data_retriever"
+				],
+				"execution_count": null
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"%run tests/test_notebooks/ingestion_api_token_authenticator_unit_tests"
+				],
+				"execution_count": null
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"import unittest\r\n",
+					"from unittest.mock import Mock, patch, MagicMock, ANY\r\n",
+					"from requests.exceptions import RequestException\r\n",
+					"from requests import HTTPError\r\n",
+					"\r\n",
+					"class TestApiDataRetriever(SparkSessionBaseClass):\r\n",
+					"\r\n",
+					"    @classmethod\r\n",
+					"    def setUpClass(cls):\r\n",
+					"        super().setUpClass()\r\n",
+					"        cls.params = {\r\n",
+					"            \"api_name\": \"my_api\",\r\n",
+					"            \"api_host_name\": \"http://my-api-hostname.com\",\r\n",
+					"            \"version\": \"v1\",\r\n",
+					"            \"record_count_to_request\": 10\r\n",
+					"        }\r\n",
+					"    \r\n",
+					"    def setUp(self):\r\n",
+					"        # Setup code before each test method\r\n",
+					"        super().setUp()\r\n",
+					"        self.table_actions = Mock()\r\n",
+					"        self.telemetry_client = Mock()\r\n",
+					"        self.table_service_client = Mock()\r\n",
+					"        self.api_processor = Mock()\r\n",
+					"        self.token_auth = Mock()\r\n",
+					"\r\n",
+					"    @patch.object(AzureTableClient, \"retrieve_cursor\")\r\n",
+					"    @patch.object(TokenAuthenticator, \"get_auth_token_iterator\")\r\n",
+					"    def test_retrieve_data_from_api(self, mock_retrieve_cursor, mock_authenticator):\r\n",
+					"        table_actions = Mock()\r\n",
+					"        telemetry_client = Mock()\r\n",
+					"        table_service_client = Mock()\r\n",
+					"        api_processor = Mock()\r\n",
+					"        token_auth = Mock()\r\n",
+					"\r\n",
+					"        # Define mock objects and values\r\n",
+					"        with patch(\"requests.Session.get\") as mock_get:\r\n",
+					"            # Example usage:\r\n",
+					"            tokens = [\"token1\", \"token2\", \"token3\"]\r\n",
+					"            mock_iterator = iter(tokens)\r\n",
+					"\r\n",
+					"            token_auth.get_auth_token_iterator = MagicMock(return_value = mock_iterator)\r\n",
+					"            # Arrange\r\n",
+					"            mock_response = MagicMock()\r\n",
+					"            mock_response.status_code = 200\r\n",
+					"            mock_response.raise_for_status = MagicMock()\r\n",
+					"\r\n",
+					"            # Mock the return values for patched methods\r\n",
+					"            mock_get.return_value = mock_response\r\n",
+					"            mock_retrieve_cursor.return_value = \"mock_current_cursor\"\r\n",
+					"            mock_authenticator.return_value = TestMockTokenAuthenticator.mock_token\r\n",
+					"            \r\n",
+					"            api_retriever = ApiDataRetriever(\r\n",
+					"                params=self.params,\r\n",
+					"                table_actions=table_actions,\r\n",
+					"                telemetry_client=telemetry_client,\r\n",
+					"                table_service_client=table_service_client,\r\n",
+					"                api_processor=api_processor,\r\n",
+					"                token_authenticator=token_auth\r\n",
+					"                )\r\n",
+					"\r\n",
+					"            # Act\r\n",
+					"            # Call the method under test\r\n",
+					"            api_retriever.retrieve_data_from_api()\r\n",
+					"\r\n",
+					"            # Assert that the expected methods were called on mock objects\r\n",
+					"            api_retriever.telemetry_client.track_event.assert_called_with('Completed ingestion logic for my_api.')\r\n",
+					"            api_retriever.table_service_client.retrieve_cursor.assert_called_once_with(partition_key='my_api', row_key='my_api', property_name='NextIngestionCursor')\r\n",
+					"\r\n",
+					"            expected_log_count = 13\r\n",
+					"            actual_log_count = api_retriever.telemetry_client.track_event.call_count\r\n",
+					"\r\n",
+					"            log_count_msg = f\"Expected {expected_log_count} track_event() calls. Result was {actual_log_count}\"\r\n",
+					"            assert actual_log_count == expected_log_count, log_count_msg\r\n",
+					"\r\n",
+					"            expected_retrieve_cursor_count = 1\r\n",
+					"            actual_retrieve_cursor_count = api_retriever.table_service_client.retrieve_cursor.call_count\r\n",
+					"\r\n",
+					"            # Assert the number of times table_service_client.retrieve_cursor was called\r\n",
+					"            retrieve_cursor_count_msg = f\"Expected {expected_retrieve_cursor_count} retrieve cursor count calls. Result was {actual_retrieve_cursor_count}\"\r\n",
+					"\r\n",
+					"            assert actual_retrieve_cursor_count == expected_retrieve_cursor_count, retrieve_cursor_count_msg\r\n",
+					"\r\n",
+					"    @patch.object(AzureTableClient, \"retrieve_cursor\")\r\n",
+					"    @patch.object(TokenAuthenticator, \"get_auth_token_iterator\")\r\n",
+					"    def test_retrieve_data_no_records(self, mock_retrieve_cursor, mock_authenticator):\r\n",
+					"        table_actions = Mock()\r\n",
+					"        telemetry_client = Mock()\r\n",
+					"        table_service_client = Mock()\r\n",
+					"        api_processor = Mock()\r\n",
+					"        token_auth = Mock()\r\n",
+					"\r\n",
+					"        with patch(\"requests.Session.get\") as mock_get:\r\n",
+					"\r\n",
+					"            tokens = [\"token1\", \"token2\", \"token3\"]\r\n",
+					"            mock_iterator = iter(tokens)\r\n",
+					"\r\n",
+					"            # token_auth.get_auth_token = MagicMock(return_value = \"mock_token\")\r\n",
+					"            token_auth.get_auth_token_iterator = MagicMock(return_value = mock_iterator)\r\n",
+					"            # Arrange\r\n",
+					"            mock_response = MagicMock()\r\n",
+					"            mock_response.status_code = 200\r\n",
+					"            mock_response.raise_for_status = MagicMock()\r\n",
+					"            mock_response.json.return_value = {\"updateSequence\": [], \"nextCursor\": \"new_cursor\"}\r\n",
+					"\r\n",
+					"            # Mock the return values for patched methods\r\n",
+					"            mock_get.return_value = mock_response\r\n",
+					"            mock_retrieve_cursor.return_value = \"mock_current_cursor\"\r\n",
+					"            mock_authenticator.return_value = TestMockTokenAuthenticator.mock_token\r\n",
+					"            \r\n",
+					"            api_retriever = ApiDataRetriever(\r\n",
+					"                params=self.params,\r\n",
+					"                table_actions=table_actions,\r\n",
+					"                telemetry_client=telemetry_client,\r\n",
+					"                table_service_client=table_service_client,\r\n",
+					"                api_processor=api_processor,\r\n",
+					"                token_authenticator=token_auth            \r\n",
+					"\t\t)\r\n",
+					"\r\n",
+					"            # Act\r\n",
+					"            # Call the method under test\r\n",
+					"            api_retriever.retrieve_data_from_api()\r\n",
+					"\r\n",
+					"            # Assert that the expected methods were called on mock objects\r\n",
+					"            api_retriever.telemetry_client.track_event.assert_called_with('Completed ingestion logic for my_api.')\r\n",
+					"            api_retriever.table_service_client.retrieve_cursor.assert_called_with(partition_key='my_api', row_key='my_api', property_name='NextIngestionCursor')\r\n",
+					"\r\n",
+					"            expected_log_count = 13\r\n",
+					"            actual_log_count = api_retriever.telemetry_client.track_event.call_count\r\n",
+					"\r\n",
+					"            log_count_msg = f\"Expected {expected_log_count} track_event() calls. Result was {actual_log_count}\"\r\n",
+					"            assert actual_log_count == expected_log_count, log_count_msg\r\n",
+					"\r\n",
+					"            expected_retrieve_cursor_count = 1\r\n",
+					"            actual_retrieve_cursor_count = api_retriever.table_service_client.retrieve_cursor.call_count\r\n",
+					"\r\n",
+					"            # Assert the number of times table_service_client.retrieve_cursor was called\r\n",
+					"            retrieve_cursor_count_msg = f\"Expected {expected_retrieve_cursor_count} retrieve cursor count calls. Result was {actual_retrieve_cursor_count}\"\r\n",
+					"\r\n",
+					"            assert actual_retrieve_cursor_count == expected_retrieve_cursor_count, retrieve_cursor_count_msg     \r\n",
+					""
+				],
+				"execution_count": null
+			}
+		]
+	}
+}

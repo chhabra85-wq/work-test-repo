@@ -1,0 +1,176 @@
+{
+	"name": "flattened_nested_json_unit_tests",
+	"properties": {
+		"folder": {
+			"name": "tests/test_notebooks"
+		},
+		"nbformat": 4,
+		"nbformat_minor": 2,
+		"bigDataPool": {
+			"referenceName": "devpoolv34",
+			"type": "BigDataPoolReference"
+		},
+		"sessionProperties": {
+			"driverMemory": "112g",
+			"driverCores": 16,
+			"executorMemory": "112g",
+			"executorCores": 16,
+			"numExecutors": 2,
+			"conf": {
+				"spark.dynamicAllocation.enabled": "false",
+				"spark.dynamicAllocation.minExecutors": "2",
+				"spark.dynamicAllocation.maxExecutors": "2",
+				"spark.autotune.trackingId": "65a26e40-bed5-4692-af41-dec32048a5be"
+			}
+		},
+		"metadata": {
+			"saveOutput": true,
+			"enableDebugMode": true,
+			"kernelspec": {
+				"name": "synapse_pyspark",
+				"display_name": "Synapse PySpark"
+			},
+			"language_info": {
+				"name": "python"
+			},
+			"a365ComputeOptions": {
+				"id": "/subscriptions/f8a339ea-4445-4d69-a4bb-b7c77c9db241/resourceGroups/RG-Cartier-Dev/providers/Microsoft.Synapse/workspaces/synw-time-cartier-dev/bigDataPools/devpool",
+				"name": "devpoolv34",
+				"type": "Spark",
+				"endpoint": "https://synw-time-cartier-dev.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/devpool",
+				"auth": {
+					"type": "AAD",
+					"authResource": "https://dev.azuresynapse.net"
+				},
+				"sparkVersion": "3.3",
+				"nodeCount": 10,
+				"cores": 16,
+				"memory": 112,
+				"automaticScaleJobs": false
+			},
+			"sessionKeepAliveTimeout": 30
+		},
+		"cells": [
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"%run ingestion/utilities/flattened_nested_json"
+				],
+				"execution_count": 1
+			},
+			{
+				"cell_type": "code",
+				"source": [
+					"import pytest\r\n",
+					"import json\r\n",
+					"import unittest\r\n",
+					"from pyspark.sql import SparkSession\r\n",
+					"from pyspark.sql.types import StructType, StructField, StringType, LongType\r\n",
+					"\r\n",
+					"class TestFlattenedNestedJsonUnit(SparkSessionBaseClass):\r\n",
+					"\r\n",
+					"    def test_flatten_df(self):\r\n",
+					"        \"\"\"\r\n",
+					"        Tests the behavior of the flatten_df method\r\n",
+					"        Asserts that nested object is correctly flatten \r\n",
+					"        \"\"\"     \r\n",
+					"\r\n",
+					"        # ARRANGE\r\n",
+					"        nested_object = {\r\n",
+					"            \"person\": {\r\n",
+					"                \"name\": \"John\",\r\n",
+					"                \"age\": 30,\r\n",
+					"                \"favoritefood\": \"Pizza\",\r\n",
+					"                \"parent\": [\r\n",
+					"                    {\r\n",
+					"                        \"name\": \"Alice\",\r\n",
+					"                        \"age\": 55,\r\n",
+					"                        \"favoritefood\": \"Pasta\",\r\n",
+					"                        \"gender\": \"female\",\r\n",
+					"                        \"grandParent\": [\r\n",
+					"                            {\r\n",
+					"                                \"name\": \"Eve\",\r\n",
+					"                                \"age\": 80,\r\n",
+					"                                \"favoritefood\": \"Salad\",\r\n",
+					"                                \"gender\": \"female\"\r\n",
+					"                            },\r\n",
+					"                            {\r\n",
+					"                                \"name\": \"David\",\r\n",
+					"                                \"age\": 85,\r\n",
+					"                                \"favoritefood\": \"Soup\",\r\n",
+					"                                \"gender\": \"male\"\r\n",
+					"                            }\r\n",
+					"                        ]\r\n",
+					"                    },\r\n",
+					"                    {\r\n",
+					"                        \"name\": \"Bob\",\r\n",
+					"                        \"age\": 58,\r\n",
+					"                        \"favoritefood\": \"Steak\",\r\n",
+					"                        \"gender\": \"male\",\r\n",
+					"                        \"grandParent\": [\r\n",
+					"                            {\r\n",
+					"                                \"name\": \"Grace\",\r\n",
+					"                                \"age\": 70,\r\n",
+					"                                \"favoritefood\": \"Fish\",\r\n",
+					"                                \"gender\": \"female\"\r\n",
+					"                            },\r\n",
+					"                            {\r\n",
+					"                                \"name\": \"Jacob\",\r\n",
+					"                                \"age\": 75,\r\n",
+					"                                \"favoritefood\": \"Chicken\",\r\n",
+					"                                \"gender\": \"male\"\r\n",
+					"                            }\r\n",
+					"                        ]\r\n",
+					"                    }\r\n",
+					"                ]\r\n",
+					"            }            \r\n",
+					"        }\r\n",
+					"\r\n",
+					"        expected_schema = StructType([\r\n",
+					"            StructField('person_age', LongType(), True), \r\n",
+					"            StructField('person_favoritefood', StringType(), True),\r\n",
+					"            StructField('person_name', StringType(), True), \r\n",
+					"            StructField('person_parent_age', LongType(), True), \r\n",
+					"            StructField('person_parent_favoritefood', StringType(), True), \r\n",
+					"            StructField('person_parent_gender', StringType(), True), \r\n",
+					"            StructField('person_parent_name', StringType(), True), \r\n",
+					"            StructField('person_parent_grandParent_age', LongType(), True), \r\n",
+					"            StructField('person_parent_grandParent_favoritefood', StringType(), True), \r\n",
+					"            StructField('person_parent_grandParent_gender', StringType(), True), \r\n",
+					"            StructField('person_parent_grandParent_name', StringType(), True)\r\n",
+					"        ])\r\n",
+					"\r\n",
+					"\r\n",
+					"        nested_json = json.dumps(nested_object)\r\n",
+					"        nested_df = self.spark_session.read.option(\"mergeSchema\", \"true\").json(self.spark_session.sparkContext.parallelize([nested_json]))\r\n",
+					"        \r\n",
+					"        flatten_nested_json = FlattenNestedJson()\r\n",
+					"\r\n",
+					"        # ACT\r\n",
+					"        nested_df = flatten_nested_json.flatten_df(nested_df)\r\n",
+					"        nested_df_count = nested_df.count()\r\n",
+					"        nested_df_schema = nested_df.schema\r\n",
+					"        \r\n",
+					"        # ASSERT\r\n",
+					"        assert nested_df.count() == 4, f\"Expected flattened df count to be 4 but was {nested_df_count}.\"\r\n",
+					"        assert nested_df_schema != None, f\"Expected schema to not be null.\"\r\n",
+					"        assert nested_df_schema == expected_schema, f\"Expected schema: {expected_schema}.\\nResulting schema: {nested_df_schema}.\"\r\n",
+					"    \r\n",
+					"    "
+				],
+				"execution_count": 2
+			}
+		]
+	}
+}

@@ -1,0 +1,127 @@
+{
+	"name": "helper_mssparkutils",
+	"properties": {
+		"folder": {
+			"name": "helpers"
+		},
+		"nbformat": 4,
+		"nbformat_minor": 2,
+		"bigDataPool": {
+			"referenceName": "devpoolv34",
+			"type": "BigDataPoolReference"
+		},
+		"sessionProperties": {
+			"driverMemory": "112g",
+			"driverCores": 16,
+			"executorMemory": "112g",
+			"executorCores": 16,
+			"numExecutors": 2,
+			"conf": {
+				"spark.dynamicAllocation.enabled": "false",
+				"spark.dynamicAllocation.minExecutors": "2",
+				"spark.dynamicAllocation.maxExecutors": "2",
+				"spark.autotune.trackingId": "d2c921ba-ed4e-44f8-a599-78ec7d8ba2ac"
+			}
+		},
+		"metadata": {
+			"saveOutput": true,
+			"enableDebugMode": true,
+			"kernelspec": {
+				"name": "synapse_pyspark",
+				"display_name": "Synapse PySpark"
+			},
+			"language_info": {
+				"name": "python"
+			},
+			"a365ComputeOptions": {
+				"id": "/subscriptions/f8a339ea-4445-4d69-a4bb-b7c77c9db241/resourceGroups/RG-Cartier-Dev/providers/Microsoft.Synapse/workspaces/synw-time-cartier-dev/bigDataPools/devpoolv34",
+				"name": "devpoolv34",
+				"type": "Spark",
+				"endpoint": "https://synw-time-cartier-dev.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/devpoolv34",
+				"auth": {
+					"type": "AAD",
+					"authResource": "https://dev.azuresynapse.net"
+				},
+				"sparkVersion": "3.4",
+				"nodeCount": 3,
+				"cores": 8,
+				"memory": 56,
+				"automaticScaleJobs": false
+			},
+			"sessionKeepAliveTimeout": 30
+		},
+		"cells": [
+			{
+				"cell_type": "code",
+				"source": [
+					"from notebookutils import mssparkutils\r\n",
+					"from typing import List\r\n",
+					"\r\n",
+					"class MsSparkUtils:\r\n",
+					"    \"\"\"Class supporting mssparkutils operations\"\"\"\r\n",
+					"\r\n",
+					"    def list_directory_contents(self, path: str):\r\n",
+					"        \"\"\"\r\n",
+					"        Lists the contents of a directory\r\n",
+					"\r\n",
+					"        Arguments:\r\n",
+					"            path (String): Directory to get contents from\r\n",
+					"        Returns:\r\n",
+					"            List of FileInfo objects\r\n",
+					"        \"\"\"        \r\n",
+					"        return mssparkutils.fs.ls(path)\r\n",
+					"\r\n",
+					"    def move_directory(self, from_path: str, to_path: str):\r\n",
+					"        \"\"\"\r\n",
+					"        Moves a file or directory\r\n",
+					"\r\n",
+					"        Arguments:\r\n",
+					"            from_path (String): Location of item to move from\r\n",
+					"            to_path (String): Location of time to move to\r\n",
+					"        Returns:\r\n",
+					"            Boolean for success or failure            \r\n",
+					"        \"\"\"                \r\n",
+					"        return mssparkutils.fs.mv(from_path, to_path, overwrite=True)\r\n",
+					"\r\n",
+					"    def delete_directory(self, path: str, recurse: bool = False):\r\n",
+					"        \"\"\"\r\n",
+					"        Removes a file or directory\r\n",
+					"\r\n",
+					"        Arguments:\r\n",
+					"            path (String): Location of file or directory to delete\r\n",
+					"            recurse (Boolean): Recursive query value to delete nested filess or directories  \r\n",
+					"        Returns:\r\n",
+					"            Boolean for success or failure            \r\n",
+					"        \"\"\"          \r\n",
+					"        return mssparkutils.fs.rm(path, recurse)\r\n",
+					"    \r\n",
+					"    def replace(self, from_path: str, to_path: str):\r\n",
+					"        \"\"\"\r\n",
+					"        Copies a file into given location; overwrites file if already exists.\r\n",
+					"        Removes original file source location.\r\n",
+					"\r\n",
+					"        Arguments:\r\n",
+					"            from_path (String): Location of item to get \r\n",
+					"            to_path (String): Location of item to replace           \r\n",
+					"        \"\"\"                \r\n",
+					"        return mssparkutils.fs.mv(from_path, to_path, overwrite=True)        \r\n",
+					"        mssparkutils.fs.cp(from_path, to_path)\r\n",
+					"        mssparkutils.fs.rm(from_path)\r\n",
+					"\r\n",
+					"\r\n",
+					"    def does_path_exist(self, path: str):\r\n",
+					"        \"\"\"\r\n",
+					"        Verifies if folder path or full file name exists.\r\n",
+					"\r\n",
+					"        Arguments:\r\n",
+					"            path (String): Folder path or full file name.\r\n",
+					"        Returns:\r\n",
+					"            Boolean, if exists true else false\r\n",
+					"        \"\"\"            \r\n",
+					"        return mssparkutils.fs.exists(path)"
+				],
+				"execution_count": 3
+			}
+		]
+	}
+}

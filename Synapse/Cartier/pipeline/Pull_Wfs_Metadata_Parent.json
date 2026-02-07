@@ -1,0 +1,68 @@
+{
+	"name": "Pull_Wfs_Metadata_Parent",
+	"properties": {
+		"activities": [
+			{
+				"name": "Execute Pull_Wfs_Metadata_Child",
+				"type": "ExecutePipeline",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "Pull_Wfs_Metadata_Child",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"ExpectedFiles": {
+							"value": "@pipeline().parameters.ExpectedFiles",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "ICMConnectorFunction",
+				"type": "AzureFunctionActivity",
+				"dependsOn": [
+					{
+						"activity": "Execute Pull_Wfs_Metadata_Child",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"functionName": "icmConnector",
+					"method": "POST",
+					"body": {
+						"value": "{\nTitle: \"Synapse Analytics pipeline failure: @{pipeline().Pipeline} in @{pipeline().DataFactory} failed\",\nDescriptionText: \"<br><u><b><h3>@{pipeline().Pipeline} in @{pipeline().DataFactory} identified a failure.</h3></b></u><b>Current pipeline Run ID: </b>@{pipeline().RunId}<br><br><b>Failed child pipeline: </b>@{activity('Execute Pull_Wfs_Metadata_Child').output.pipelineName}'s run ID @{activity('Execute Pull_Wfs_Metadata_Child').output.pipelineRunId}<br><b>About this pipeline: </b>This pipeline is scheduled to run at 11 PM PT. It fetches the metadata files that WFS would have exported, processes them, creates the PayCodeMetadata table store, and publishes the TR01 metadata entities to HR Data Lake's publish\\\\TR01 path. <br><br><b>Impact of this failure: </b>Metadata files describing time-off, attendance and accrual paytypes on HR Data lake will be stale.<br><br><b>What to verify?</b>:<li> Step 1: Look up the failed pipeline's runID @{activity('Execute Pull_Wfs_Metadata_Child').output.pipelineRunId} on Synapse Analytics --> Monitor --> Pipeline Runs. <li>Step 2: Click on that failed instance and drill into the pipeline execution steps until you find the failed task. <li> Step 3: Click on the failed task to look up the reason for failure. Refer to steps to recover from failure listed below. <br><br><b>Steps to recover from failure: </b> Refer to the troubleshooting guide linked to this incident. It points to the TSG MD files in this service's repository. <br><br><b>Contacts to notify if this results in stale HR DL data: </b><a href mailto:tr01subscribers@microsoft.com>TR01Subscribers@microsoft.com</a><br>\",\nSeverity: \"4\"\n}",
+						"type": "Expression"
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "ICMConnector",
+					"type": "LinkedServiceReference"
+				}
+			}
+		],
+		"parameters": {
+			"ExpectedFiles": {
+				"type": "array",
+				"defaultValue": []
+			}
+		},
+		"folder": {
+			"name": "WFS"
+		},
+		"annotations": []
+	}
+}

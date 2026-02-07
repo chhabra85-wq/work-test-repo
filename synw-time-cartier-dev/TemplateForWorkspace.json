@@ -1,0 +1,1156 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"workspaceName": {
+			"type": "string",
+			"metadata": "Workspace name",
+			"defaultValue": "synw-time-cartier-dev"
+		},
+		"CartierTableStorage_connectionString": {
+			"type": "secureString",
+			"metadata": "Secure string for 'connectionString' of 'CartierTableStorage'",
+			"defaultValue": "DefaultEndpointsProtocol=https;AccountName=@{linkedService().storageAccountName};"
+		},
+		"synw-time-cartier-dev-WorkspaceDefaultSqlServer_connectionString": {
+			"type": "secureString",
+			"metadata": "Secure string for 'connectionString' of 'synw-time-cartier-dev-WorkspaceDefaultSqlServer'",
+			"defaultValue": "Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=tcp:synw-time-cartier-dev.sql.azuresynapse.net,1433;Initial Catalog=@{linkedService().DBName}"
+		},
+		"CartierBlobStorage_properties_typeProperties_serviceEndpoint": {
+			"type": "string",
+			"defaultValue": "https://strcartierdev.blob.core.windows.net"
+		},
+		"CartierKeyVault_properties_typeProperties_baseUrl": {
+			"type": "string",
+			"defaultValue": "https://time-cartier-devkv.vault.azure.net/"
+		},
+		"synw-time-cartier-dev-WorkspaceDefaultStorage_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "https://strcartierdev.dfs.core.windows.net"
+		}
+	},
+	"variables": {
+		"workspaceId": "[concat('Microsoft.Synapse/workspaces/', parameters('workspaceName'))]"
+	},
+	"resources": [
+		{
+			"name": "[concat(parameters('workspaceName'), '/CartierBlobStorage')]",
+			"type": "Microsoft.Synapse/workspaces/linkedServices",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"annotations": [],
+				"type": "AzureBlobStorage",
+				"typeProperties": {
+					"serviceEndpoint": "[parameters('CartierBlobStorage_properties_typeProperties_serviceEndpoint')]",
+					"accountKind": "StorageV2"
+				},
+				"connectVia": {
+					"referenceName": "AutoResolveIntegrationRuntime",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/CartierKeyVault')]",
+			"type": "Microsoft.Synapse/workspaces/linkedServices",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"annotations": [],
+				"type": "AzureKeyVault",
+				"typeProperties": {
+					"baseUrl": "[parameters('CartierKeyVault_properties_typeProperties_baseUrl')]"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/CartierTableStorage')]",
+			"type": "Microsoft.Synapse/workspaces/linkedServices",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"parameters": {
+					"storageAccountName": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "AzureTableStorage",
+				"typeProperties": {
+					"connectionString": "[parameters('CartierTableStorage_connectionString')]",
+					"accountKey": {
+						"type": "AzureKeyVaultSecret",
+						"store": {
+							"referenceName": "CartierKeyVault",
+							"type": "LinkedServiceReference"
+						},
+						"secretName": "CartierStorageAccountKey"
+					}
+				},
+				"connectVia": {
+					"referenceName": "AutoResolveIntegrationRuntime",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]",
+				"[concat(variables('workspaceId'), '/linkedServices/CartierKeyVault')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/synw-time-cartier-dev-WorkspaceDefaultSqlServer')]",
+			"type": "Microsoft.Synapse/workspaces/linkedServices",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"parameters": {
+					"DBName": {
+						"type": "String"
+					}
+				},
+				"annotations": [],
+				"type": "AzureSqlDW",
+				"typeProperties": {
+					"connectionString": "[parameters('synw-time-cartier-dev-WorkspaceDefaultSqlServer_connectionString')]"
+				},
+				"connectVia": {
+					"referenceName": "AutoResolveIntegrationRuntime",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/synw-time-cartier-dev-WorkspaceDefaultStorage')]",
+			"type": "Microsoft.Synapse/workspaces/linkedServices",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"annotations": [],
+				"type": "AzureBlobFS",
+				"typeProperties": {
+					"url": "[parameters('synw-time-cartier-dev-WorkspaceDefaultStorage_properties_typeProperties_url')]"
+				},
+				"connectVia": {
+					"referenceName": "AutoResolveIntegrationRuntime",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/AutoResolveIntegrationRuntime')]",
+			"type": "Microsoft.Synapse/workspaces/integrationRuntimes",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"type": "Managed",
+				"typeProperties": {
+					"computeProperties": {
+						"location": "AutoResolve",
+						"dataFlowProperties": {
+							"computeType": "General",
+							"coreCount": 8,
+							"timeToLive": 0
+						}
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/WorkspaceSystemIdentity')]",
+			"type": "Microsoft.Synapse/workspaces/credentials",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"type": "ManagedIdentity",
+				"typeProperties": {}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/Notebook 1')]",
+			"type": "Microsoft.Synapse/workspaces/notebooks",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"nbformat": 4,
+				"nbformat_minor": 2,
+				"sessionProperties": {
+					"driverMemory": "28g",
+					"driverCores": 4,
+					"executorMemory": "28g",
+					"executorCores": 4,
+					"numExecutors": 2,
+					"conf": {
+						"spark.dynamicAllocation.enabled": "false",
+						"spark.dynamicAllocation.minExecutors": "2",
+						"spark.dynamicAllocation.maxExecutors": "2",
+						"spark.autotune.trackingId": "93ca60c8-2d8a-45f9-8706-d47b3d2abcc4"
+					}
+				},
+				"metadata": {
+					"saveOutput": true,
+					"enableDebugMode": false,
+					"kernelspec": {
+						"name": "synapse_pyspark",
+						"display_name": "python"
+					},
+					"language_info": {
+						"name": "python"
+					},
+					"sessionKeepAliveTimeout": 30
+				},
+				"cells": [
+					{
+						"cell_type": "code",
+						"source": [
+							""
+						],
+						"outputs": [],
+						"execution_count": null
+					}
+				]
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/data_configs')]",
+			"type": "Microsoft.Synapse/workspaces/notebooks",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"folder": {
+					"name": "config"
+				},
+				"nbformat": 4,
+				"nbformat_minor": 2,
+				"bigDataPool": {
+					"referenceName": "albertoPool",
+					"type": "BigDataPoolReference"
+				},
+				"sessionProperties": {
+					"driverMemory": "56g",
+					"driverCores": 8,
+					"executorMemory": "56g",
+					"executorCores": 8,
+					"numExecutors": 2,
+					"conf": {
+						"spark.dynamicAllocation.enabled": "false",
+						"spark.dynamicAllocation.minExecutors": "2",
+						"spark.dynamicAllocation.maxExecutors": "2",
+						"spark.autotune.trackingId": "6d14283b-0fd6-4327-83a4-39059e1eef9a"
+					}
+				},
+				"metadata": {
+					"saveOutput": true,
+					"enableDebugMode": true,
+					"kernelspec": {
+						"name": "synapse_pyspark",
+						"display_name": "Synapse PySpark"
+					},
+					"language_info": {
+						"name": "python"
+					},
+					"a365ComputeOptions": {
+						"id": "/subscriptions/f8a339ea-4445-4d69-a4bb-b7c77c9db241/resourceGroups/RG-Cartier-Dev/providers/Microsoft.Synapse/workspaces/synw-time-cartier-dev/bigDataPools/albertoPool",
+						"name": "albertoPool",
+						"type": "Spark",
+						"endpoint": "https://synw-time-cartier-dev.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/albertoPool",
+						"auth": {
+							"type": "AAD",
+							"authResource": "https://dev.azuresynapse.net"
+						},
+						"sparkVersion": "3.3",
+						"nodeCount": 10,
+						"cores": 8,
+						"memory": 56
+					},
+					"sessionKeepAliveTimeout": 30
+				},
+				"cells": [
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"**Functional config class per dataset**\r\n",
+							"- configs contain metadata that is used by to datasets\r\n",
+							"- each dataset needs a config value to be  processed\r\n",
+							"- examples of metadata include: schema, valitions, primarKeys etc"
+						]
+					},
+					{
+						"cell_type": "code",
+						"source": [
+							"class DataConfigs:\r\n",
+							"\r\n",
+							"    bank_config =  '''{\r\n",
+							"        \"dataName\": \"bank\",\r\n",
+							"        \"dataType\": \"api\",\r\n",
+							"        \"dataSource\": \"wfs\",\r\n",
+							"        \"version\": 1,\r\n",
+							"        \"bronze\": {\r\n",
+							"            \"finalizedSchemaSet\": {\r\n",
+							"            },\r\n",
+							"            \"validationColumnRules\": [\r\n",
+							"            ],\r\n",
+							"            \"vaidationDfRules\": [                \r\n",
+							"            ]\r\n",
+							"        },\r\n",
+							"        \"silver\": {\r\n",
+							"            \"finalizedSchemaSet\": {\r\n",
+							"                \"bankId\" : \"upsert.bankId\", \r\n",
+							"                \"dataChange\" : \"upsert.dataChange\", \r\n",
+							"                \"endAt\" : \"upsert.endAt\",\r\n",
+							"                \"externalMatchId\" : \"upsert.externalMatchId\" ,\r\n",
+							"                \"generatedAt\" : \"upsert.generatedAt\",\r\n",
+							"                \"name\" : \"upsert.name\",\r\n",
+							"                \"recordId\" : \"upsert.recordId\",\r\n",
+							"                \"sequence\" : \"upsert.sequence\",\r\n",
+							"                \"startAt\" : \"upsert.startAt\",\r\n",
+							"                \"unit\" : \"upsert.unit\",\r\n",
+							"                \"balancesBalance\" : \"upsert.balances_balance\",\r\n",
+							"                \"balancesDate\" : \"upsert.balances_date\",\r\n",
+							"                \"balancesEmployeeJob\" : \"upsert.balances_employeeJob\",\r\n",
+							"                \"index\" : \"upsert.Index\",\r\n",
+							"                \"cartierId\" : \"upsert.cartierId\",\r\n",
+							"                \"runActivityId\" : \"upsert.runActivityId\",\r\n",
+							"                \"runExecutionTime\" : \"upsert.runExecutionTime\"\r\n",
+							"            },\r\n",
+							"            \"validationColumnRules\": [ {\r\n",
+							"                    \"targetColumns\": [\"dataChange\", \"externalMatchId\", \"Index\", \"bankId\"],\r\n",
+							"                    \"ruleExpression\": \"column_name IS NOT NULL\",\r\n",
+							"                    \"ruleExpressionType\": \"PySpark.DataFrame.Filter(str)\"\r\n",
+							"                }\r\n",
+							"            ],\r\n",
+							"            \"vaidationDfRules\": [                \r\n",
+							"            ]            \r\n",
+							"        },\r\n",
+							"        \"gold\": {\r\n",
+							"            \"finalizedSchemaSet\": {\r\n",
+							"                \"employeeId\" : \"upsert.externalMatchId\" ,\r\n",
+							"                \"bankType\" : \"upsert.bankId\", \r\n",
+							"                \"balanceUnit\" : \"upsert.unit\",\r\n",
+							"                \"balanceAccrual\" : \"upsert.balancesBalance\",\r\n",
+							"                \"balanceDate\" : \"upsert.balancesDate\",\r\n",
+							"                \"lastUpdatedOn\": \"upsert.runExecutionTime\",\r\n",
+							"                \"cartierId\" : \"upsert.cartierId\"\r\n",
+							"            },\r\n",
+							"            \"validationColumnRules\": [\r\n",
+							"            ],\r\n",
+							"            \"vaidationDfRules\": [                \r\n",
+							"            ]\r\n",
+							"        }\r\n",
+							"    }'''\r\n",
+							""
+						],
+						"outputs": [],
+						"execution_count": 1
+					}
+				]
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/helper_config_keys')]",
+			"type": "Microsoft.Synapse/workspaces/notebooks",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"folder": {
+					"name": "helpers"
+				},
+				"nbformat": 4,
+				"nbformat_minor": 2,
+				"sessionProperties": {
+					"driverMemory": "28g",
+					"driverCores": 4,
+					"executorMemory": "28g",
+					"executorCores": 4,
+					"numExecutors": 2,
+					"runAsWorkspaceSystemIdentity": false,
+					"conf": {
+						"spark.dynamicAllocation.enabled": "false",
+						"spark.dynamicAllocation.minExecutors": "2",
+						"spark.dynamicAllocation.maxExecutors": "2",
+						"spark.autotune.trackingId": "5a79561c-9305-4850-8b0c-ddf5a54e2b89"
+					}
+				},
+				"metadata": {
+					"saveOutput": true,
+					"enableDebugMode": false,
+					"kernelspec": {
+						"name": "synapse_pyspark",
+						"display_name": "python"
+					},
+					"language_info": {
+						"name": "python"
+					},
+					"sessionKeepAliveTimeout": 30
+				},
+				"cells": [
+					{
+						"cell_type": "code",
+						"source": [
+							""
+						],
+						"outputs": [],
+						"execution_count": null
+					}
+				]
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/helper_config_provider')]",
+			"type": "Microsoft.Synapse/workspaces/notebooks",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"folder": {
+					"name": "helpers"
+				},
+				"nbformat": 4,
+				"nbformat_minor": 2,
+				"sessionProperties": {
+					"driverMemory": "28g",
+					"driverCores": 4,
+					"executorMemory": "28g",
+					"executorCores": 4,
+					"numExecutors": 2,
+					"runAsWorkspaceSystemIdentity": false,
+					"conf": {
+						"spark.dynamicAllocation.enabled": "false",
+						"spark.dynamicAllocation.minExecutors": "2",
+						"spark.dynamicAllocation.maxExecutors": "2",
+						"spark.autotune.trackingId": "29d3a64e-2839-4b36-89ee-03ce25c493c8"
+					}
+				},
+				"metadata": {
+					"saveOutput": true,
+					"enableDebugMode": false,
+					"kernelspec": {
+						"name": "synapse_pyspark",
+						"display_name": "python"
+					},
+					"language_info": {
+						"name": "python"
+					},
+					"sessionKeepAliveTimeout": 30
+				},
+				"cells": [
+					{
+						"cell_type": "code",
+						"source": [
+							""
+						],
+						"outputs": [],
+						"execution_count": null
+					}
+				]
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/helper_key_vault')]",
+			"type": "Microsoft.Synapse/workspaces/notebooks",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"folder": {
+					"name": "helpers"
+				},
+				"nbformat": 4,
+				"nbformat_minor": 2,
+				"sessionProperties": {
+					"driverMemory": "28g",
+					"driverCores": 4,
+					"executorMemory": "28g",
+					"executorCores": 4,
+					"numExecutors": 2,
+					"runAsWorkspaceSystemIdentity": false,
+					"conf": {
+						"spark.dynamicAllocation.enabled": "false",
+						"spark.dynamicAllocation.minExecutors": "2",
+						"spark.dynamicAllocation.maxExecutors": "2",
+						"spark.autotune.trackingId": "0413e1db-4e52-499e-9f8f-fd7ca5273890"
+					}
+				},
+				"metadata": {
+					"saveOutput": true,
+					"enableDebugMode": false,
+					"kernelspec": {
+						"name": "synapse_pyspark",
+						"display_name": "python"
+					},
+					"language_info": {
+						"name": "python"
+					},
+					"sessionKeepAliveTimeout": 30
+				},
+				"cells": [
+					{
+						"cell_type": "code",
+						"source": [
+							"class KeyVaultClient:\r\n",
+							"    \"\"\"Class supporting Key Vault retrieval\"\"\"\r\n",
+							"    \r\n",
+							"    def __init__(self, link_kv_name):\r\n",
+							"        \"\"\"Constructor setting key vault name\"\"\"\r\n",
+							"        self.link_kv_name = link_kv_name\r\n",
+							"\r\n",
+							"    def get(self, key):\r\n",
+							"        \"\"\"\r\n",
+							"        Gets the secret for the given name\r\n",
+							"\r\n",
+							"            Parameters:\r\n",
+							"            key (string): name of secret\r\n",
+							"\r\n",
+							"            Returns:\r\n",
+							"            stirng containing secret\r\n",
+							"\r\n",
+							"        \"\"\"   \r\n",
+							"        return mssparkutils.credentials.getSecretWithLS(self.link_kv_name, key)"
+						],
+						"outputs": [],
+						"execution_count": null
+					}
+				]
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/helper_log_analytics_ex')]",
+			"type": "Microsoft.Synapse/workspaces/notebooks",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"folder": {
+					"name": "helpers"
+				},
+				"nbformat": 4,
+				"nbformat_minor": 2,
+				"bigDataPool": {
+					"referenceName": "albertoPool",
+					"type": "BigDataPoolReference"
+				},
+				"sessionProperties": {
+					"driverMemory": "56g",
+					"driverCores": 8,
+					"executorMemory": "56g",
+					"executorCores": 8,
+					"numExecutors": 2,
+					"conf": {
+						"spark.dynamicAllocation.enabled": "false",
+						"spark.dynamicAllocation.minExecutors": "2",
+						"spark.dynamicAllocation.maxExecutors": "2",
+						"spark.autotune.trackingId": "35f71026-dfdc-4e47-ac84-1cd419f15d6d"
+					}
+				},
+				"metadata": {
+					"saveOutput": true,
+					"enableDebugMode": false,
+					"kernelspec": {
+						"name": "synapse_pyspark",
+						"display_name": "Synapse PySpark"
+					},
+					"language_info": {
+						"name": "python"
+					},
+					"a365ComputeOptions": {
+						"id": "/subscriptions/f8a339ea-4445-4d69-a4bb-b7c77c9db241/resourceGroups/RG-Cartier-Dev/providers/Microsoft.Synapse/workspaces/synw-time-cartier-dev/bigDataPools/albertoPool",
+						"name": "albertoPool",
+						"type": "Spark",
+						"endpoint": "https://synw-time-cartier-dev.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/albertoPool",
+						"auth": {
+							"type": "AAD",
+							"authResource": "https://dev.azuresynapse.net"
+						},
+						"sparkVersion": "3.3",
+						"nodeCount": 10,
+						"cores": 8,
+						"memory": 56
+					},
+					"sessionKeepAliveTimeout": 30
+				},
+				"cells": [
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"**Example of how to set native spark logger**\r\n",
+							"- Requires setting an apache spark config within the manage section & enabling diagnostic setting\r\n",
+							"- Values required for config are workspaceId & workspaceKey"
+						]
+					},
+					{
+						"cell_type": "code",
+						"source": [
+							"#https://learn.microsoft.com/en-us/azure/synapse-analytics/spark/apache-spark-azure-log-analytics\r\n",
+							"logger = sc._jvm.org.apache.log4j.LogManager.getLogger(\"SetLoggerName\")\r\n",
+							"\r\n",
+							"\r\n",
+							"logger.info(f\"Logging to log analytics workspace example.\")"
+						],
+						"outputs": [],
+						"execution_count": 1
+					}
+				]
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/helper_table_storage')]",
+			"type": "Microsoft.Synapse/workspaces/notebooks",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"folder": {
+					"name": "helpers"
+				},
+				"nbformat": 4,
+				"nbformat_minor": 2,
+				"bigDataPool": {
+					"referenceName": "albertoPool",
+					"type": "BigDataPoolReference"
+				},
+				"sessionProperties": {
+					"driverMemory": "56g",
+					"driverCores": 8,
+					"executorMemory": "56g",
+					"executorCores": 8,
+					"numExecutors": 2,
+					"runAsWorkspaceSystemIdentity": false,
+					"conf": {
+						"spark.dynamicAllocation.enabled": "false",
+						"spark.dynamicAllocation.minExecutors": "2",
+						"spark.dynamicAllocation.maxExecutors": "2",
+						"spark.autotune.trackingId": "4e11f2ec-4e9d-4e3b-a9c3-b2d82d436555"
+					}
+				},
+				"metadata": {
+					"saveOutput": true,
+					"enableDebugMode": false,
+					"kernelspec": {
+						"name": "synapse_pyspark",
+						"display_name": "Synapse PySpark"
+					},
+					"language_info": {
+						"name": "python"
+					},
+					"a365ComputeOptions": {
+						"id": "/subscriptions/f8a339ea-4445-4d69-a4bb-b7c77c9db241/resourceGroups/RG-Cartier-Dev/providers/Microsoft.Synapse/workspaces/synw-time-cartier-dev/bigDataPools/albertoPool",
+						"name": "albertoPool",
+						"type": "Spark",
+						"endpoint": "https://synw-time-cartier-dev.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/albertoPool",
+						"auth": {
+							"type": "AAD",
+							"authResource": "https://dev.azuresynapse.net"
+						},
+						"sparkVersion": "3.3",
+						"nodeCount": 10,
+						"cores": 8,
+						"memory": 56
+					},
+					"sessionKeepAliveTimeout": 30
+				},
+				"cells": [
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"**Installing required packages**"
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"!pip install azure-data-tables"
+						],
+						"outputs": [],
+						"execution_count": 70
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"**Class supporting CRUD operations for Azure Storage Table**"
+						]
+					},
+					{
+						"cell_type": "code",
+						"source": [
+							"from pyspark.sql.types import StructType, StructField, StringType\r\n",
+							"from azure.data.tables import TableServiceClient\r\n",
+							"\r\n",
+							"class AzureTableClient:\r\n",
+							"    \"\"\"Class supporting CRUD operations for Azure Storage Table\"\"\"\r\n",
+							"\r\n",
+							"    def __init__(self, storage_connection_string, table_name):\r\n",
+							"        \"\"\"Constructor setting the table client which performs CRUD operations\"\"\"\r\n",
+							"        self.storage_connection_string = storage_connection_string\r\n",
+							"        table_service_client = TableServiceClient.from_connection_string(conn_str=self.storage_connection_string, table_name=table_name)\r\n",
+							"        self.table_client = table_service_client.get_table_client(table_name=table_name)\r\n",
+							"        \r\n",
+							"    def create_entity(self, entity):\r\n",
+							"        \"\"\"\r\n",
+							"        Creates an entity in table storage\r\n",
+							"\r\n",
+							"            Parameters:\r\n",
+							"            entity (any): item to be creeated\r\n",
+							"        \"\"\"\r\n",
+							"        self.table_client.create_entity(entity=entity)\r\n",
+							"    \r\n",
+							"    def get_all_table_entities_with_query_df(self, spark, table_query):\r\n",
+							"        \"\"\"\r\n",
+							"        Gets all entities for a given filter query\r\n",
+							"\r\n",
+							"            Parameters:\r\n",
+							"            spark (SparkSession): a spark session needed to create df\r\n",
+							"            table_query (string): table query filter 'IsProcessing eq false'\r\n",
+							"\r\n",
+							"            Returns:\r\n",
+							"            dataframe containing entities\r\n",
+							"\r\n",
+							"        \"\"\"                \r\n",
+							"        table_entities = self.table_client.query_entities(table_query)\r\n",
+							"        print(table_entities)\r\n",
+							"\r\n",
+							"        # Collect all the entity properties and their values into a dictionary\r\n",
+							"        data = []\r\n",
+							"        for entity in table_entities:\r\n",
+							"            row = {}\r\n",
+							"            for key in entity.keys():\r\n",
+							"                row[key] = entity[key]\r\n",
+							"            data.append(row)\r\n",
+							"            \r\n",
+							"        table_schema = StructType([StructField(key, StringType(), True) for key in data[0].keys()])\r\n",
+							"        entities_df = spark.createDataFrame(data, schema=table_schema)\r\n",
+							"        \r\n",
+							"        return entities_df    \r\n",
+							"\r\n",
+							"    def get_all_table_entities_with_query(self, table_query):\r\n",
+							"        \"\"\"\r\n",
+							"        Gets all entities for a given filter query\r\n",
+							"\r\n",
+							"            Parameters:\r\n",
+							"            table_query (string): table query filter 'IsProcessing eq false'\r\n",
+							"\r\n",
+							"            Returns:\r\n",
+							"            entities (list): collection containing entities\r\n",
+							"\r\n",
+							"        \"\"\"\r\n",
+							"        entities = []\r\n",
+							"        \r\n",
+							"        for entity in self.table_client.query_entities(table_query):\r\n",
+							"            entities.append(entity)\r\n",
+							"        \r\n",
+							"        return entities\r\n",
+							"\r\n",
+							"    def get_table_entity_df(self, spark, partition_key, row_key):\r\n",
+							"        \"\"\"\r\n",
+							"        Gets a given entity from given Partition & Row key\r\n",
+							"\r\n",
+							"            Parameters:\r\n",
+							"            partition_key (string): entity's partition key\r\n",
+							"            row_key (string): entity's row key\r\n",
+							"\r\n",
+							"            Returns:\r\n",
+							"            dataframe containing entity\r\n",
+							"\r\n",
+							"        \"\"\"           \r\n",
+							"        table_entity = self.table_client.get_entity(partition_key=partition_key, row_key=row_key)\r\n",
+							"        \r\n",
+							"        data = []\r\n",
+							"        row = {}\r\n",
+							"        for key in table_entity.keys():\r\n",
+							"            row[key] = table_entity[key]\r\n",
+							"        data.append(row)\r\n",
+							"            \r\n",
+							"        table_schema = StructType([StructField(key, StringType(), True) for key in data[0].keys()])\r\n",
+							"        entity_df = spark.createDataFrame(data, schema=table_schema)\r\n",
+							"        \r\n",
+							"        return entity_df\r\n",
+							"\r\n",
+							"    def get_table_entity_row(self, partition_key, row_key):\r\n",
+							"        \"\"\"\r\n",
+							"        Gets a given entity from given Partition & Row key\r\n",
+							"\r\n",
+							"            Parameters:\r\n",
+							"            partition_key (string): entity's partition key\r\n",
+							"            row_key (string): entity's row key\r\n",
+							"\r\n",
+							"            Returns:\r\n",
+							"            table storage entity\r\n",
+							"\r\n",
+							"        \"\"\"              \r\n",
+							"        return self.table_client.get_entity(partition_key=partition_key, row_key=row_key)        "
+						],
+						"outputs": [],
+						"execution_count": 71
+					}
+				]
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/validation_engine')]",
+			"type": "Microsoft.Synapse/workspaces/notebooks",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"folder": {
+					"name": "validation"
+				},
+				"nbformat": 4,
+				"nbformat_minor": 2,
+				"bigDataPool": {
+					"referenceName": "albertoPool",
+					"type": "BigDataPoolReference"
+				},
+				"sessionProperties": {
+					"driverMemory": "56g",
+					"driverCores": 8,
+					"executorMemory": "56g",
+					"executorCores": 8,
+					"numExecutors": 2,
+					"conf": {
+						"spark.dynamicAllocation.enabled": "false",
+						"spark.dynamicAllocation.minExecutors": "2",
+						"spark.dynamicAllocation.maxExecutors": "2",
+						"spark.autotune.trackingId": "663d2d10-149d-4e04-9b88-2688e8c34e1b"
+					}
+				},
+				"metadata": {
+					"saveOutput": true,
+					"enableDebugMode": true,
+					"kernelspec": {
+						"name": "synapse_pyspark",
+						"display_name": "Synapse PySpark"
+					},
+					"language_info": {
+						"name": "python"
+					},
+					"a365ComputeOptions": {
+						"id": "/subscriptions/f8a339ea-4445-4d69-a4bb-b7c77c9db241/resourceGroups/RG-Cartier-Dev/providers/Microsoft.Synapse/workspaces/synw-time-cartier-dev/bigDataPools/albertoPool",
+						"name": "albertoPool",
+						"type": "Spark",
+						"endpoint": "https://synw-time-cartier-dev.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/albertoPool",
+						"auth": {
+							"type": "AAD",
+							"authResource": "https://dev.azuresynapse.net"
+						},
+						"sparkVersion": "3.3",
+						"nodeCount": 10,
+						"cores": 8,
+						"memory": 56
+					},
+					"sessionKeepAliveTimeout": 30
+				},
+				"cells": [
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"**Class supporting validations on dataframes**\r\n",
+							"- Currently only supporting column validations"
+						]
+					},
+					{
+						"cell_type": "code",
+						"source": [
+							"class ValidationEngine:\r\n",
+							"    \"\"\"Class supporting validations on dataframes\"\"\"\r\n",
+							"\r\n",
+							"    def __column_rule_processor(self, validation_df, rule_expression, target_columns):\r\n",
+							"        \"\"\"\r\n",
+							"        Performs validations on column values\r\n",
+							"\r\n",
+							"            Parameters:\r\n",
+							"            validation_df (dataframe): df to validate\r\n",
+							"            rule_expression (string): a sql expression to filter columns 'column_name IS NOT NULL'\r\n",
+							"            target_columns (string): a list of columns to validate '[\"dataChange\", \"externalMatchId\"]'\r\n",
+							"\r\n",
+							"            Returns:\r\n",
+							"            filtered dataframe with records which passed validation\r\n",
+							"        \"\"\"\r\n",
+							"        column_name = \"column_name\"\r\n",
+							"        \r\n",
+							"        passed_df = validation_df\r\n",
+							"        for target_column in target_columns:\r\n",
+							"            col_rule_expression = rule_expression.replace(column_name, target_column)\r\n",
+							"\r\n",
+							"            passed_df = passed_df.filter(col_rule_expression)\r\n",
+							"        \r\n",
+							"        failed_df = validation_df.subtract(passed_df)\r\n",
+							"        failed_count = failed_df.count()     \r\n",
+							"        \r\n",
+							"        if failed_count > 0:\r\n",
+							"            # TODO: Define what happens when valiations fail? For now printing / returning passed_df\r\n",
+							"            # TODO: Do we throw exception? do we remove invalid rows and continue?\r\n",
+							"            print(f\"{failed_count} records failed validations.\")\r\n",
+							"        \r\n",
+							"        return passed_df\r\n",
+							"        \r\n",
+							"    def validate_df_columns(self, validation_df, validation_column_rules): \r\n",
+							"        \"\"\"\r\n",
+							"        Performs a set of column validations on dataframe\r\n",
+							"\r\n",
+							"            Parameters:\r\n",
+							"            validation_df (dataframe): df to validate\r\n",
+							"            validation_column_rules (object): an object containg the validations to perform\r\n",
+							"\r\n",
+							"            Returns:\r\n",
+							"            filtered dataframe with records which passed validation\r\n",
+							"        \"\"\"\r\n",
+							"        for rule in validation_column_rules:  \r\n",
+							"\r\n",
+							"            passed_df = self.__column_rule_processor(validation_df, rule[\"ruleExpression\"], rule[\"targetColumns\"])\r\n",
+							"            \r\n",
+							"        return passed_df"
+						],
+						"outputs": [],
+						"execution_count": 5
+					}
+				]
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/validation_engine_unit_tests')]",
+			"type": "Microsoft.Synapse/workspaces/notebooks",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"folder": {
+					"name": "validation"
+				},
+				"nbformat": 4,
+				"nbformat_minor": 2,
+				"bigDataPool": {
+					"referenceName": "albertoPool",
+					"type": "BigDataPoolReference"
+				},
+				"sessionProperties": {
+					"driverMemory": "56g",
+					"driverCores": 8,
+					"executorMemory": "56g",
+					"executorCores": 8,
+					"numExecutors": 2,
+					"conf": {
+						"spark.dynamicAllocation.enabled": "false",
+						"spark.dynamicAllocation.minExecutors": "2",
+						"spark.dynamicAllocation.maxExecutors": "2",
+						"spark.autotune.trackingId": "7350246b-5842-450f-906c-11f624f744ad"
+					}
+				},
+				"metadata": {
+					"saveOutput": true,
+					"enableDebugMode": true,
+					"kernelspec": {
+						"name": "synapse_pyspark",
+						"display_name": "Synapse PySpark"
+					},
+					"language_info": {
+						"name": "python"
+					},
+					"a365ComputeOptions": {
+						"id": "/subscriptions/f8a339ea-4445-4d69-a4bb-b7c77c9db241/resourceGroups/RG-Cartier-Dev/providers/Microsoft.Synapse/workspaces/synw-time-cartier-dev/bigDataPools/albertoPool",
+						"name": "albertoPool",
+						"type": "Spark",
+						"endpoint": "https://synw-time-cartier-dev.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/albertoPool",
+						"auth": {
+							"type": "AAD",
+							"authResource": "https://dev.azuresynapse.net"
+						},
+						"sparkVersion": "3.3",
+						"nodeCount": 10,
+						"cores": 8,
+						"memory": 56
+					},
+					"sessionKeepAliveTimeout": 30
+				},
+				"cells": [
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"**Instantiate validation_engine**"
+						]
+					},
+					{
+						"cell_type": "code",
+						"source": [
+							"%run validation_engine"
+						],
+						"outputs": [],
+						"execution_count": 2
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"**Test ValidationEngine**\r\n",
+							"- Executes validate_df_columns and verifies output\r\n",
+							"- still need to define pyspark test framework / general test design"
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"import json\r\n",
+							"from pyspark.sql import SparkSession\r\n",
+							"from pyspark.sql.types import StructType, StructField, StringType, LongType\r\n",
+							"\r\n",
+							"spark_session = SparkSession \\\r\n",
+							"    .builder \\\r\n",
+							"    .appName('test_validation_engine') \\\r\n",
+							"    .config(\"spark.jars.packages\", \"org.apache.hadoop:hadoop-azure:3.2.1\") \\\r\n",
+							"    .getOrCreate() \r\n",
+							"\r\n",
+							"schema = StructType([\r\n",
+							"    StructField(\"dataChange\", StringType(), True),\r\n",
+							"    StructField(\"Index\", LongType(), True),\r\n",
+							"    StructField(\"externalMatchId\", StringType(), True),\r\n",
+							"    StructField(\"balances_balance\", StringType(), True),\r\n",
+							"    StructField(\"balances_date\", StringType(), True),\r\n",
+							"    StructField(\"startAt\", StringType(), True),\r\n",
+							"    StructField(\"bankId\", StringType(), True)\r\n",
+							"])\r\n",
+							"\r\n",
+							"test_df = spark_session.createDataFrame([\r\n",
+							"        ('MERGE', 1, None, '1', '03_28_23', '03_28_23', 'VACATION'), \r\n",
+							"        ( None, 2, \"joe_id\", '1', '03_28_23', '03_28_23', 'VACATION'),\r\n",
+							"        ('MERGE', None, \"tim_id\", '1', '03_28_23', '03_28_23', 'VACATION'),\r\n",
+							"        ('MERGE', 4, \"carl_id\", '1', '03_28_23', '03_28_23', None),\r\n",
+							"        ('MERGE', 5, \"alberto_id\", '1', '03_28_23', '03_28_23', 'VACATION'),\r\n",
+							"        (None, None, None, '1', '03_28_23', '03_28_23', None),        \r\n",
+							"    ],\r\n",
+							"    schema=schema\r\n",
+							")\r\n",
+							"\r\n",
+							"validationColumnRules = [{\"targetColumns\": [\"dataChange\", \"externalMatchId\", \"Index\", \"bankId\"],\"ruleExpression\": \"column_name IS NOT NULL\"}]\r\n",
+							"\r\n",
+							"validation_engine = ValidationEngine()\r\n",
+							"expect_one_row = validation_engine.validate_df_columns(test_df, validationColumnRules).count()\r\n",
+							"print(f\"Expect 1 row, result was {expect_one_row}.\")"
+						],
+						"outputs": [],
+						"execution_count": 3
+					}
+				]
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/log-analytics-config')]",
+			"type": "Microsoft.Synapse/workspaces/sparkConfigurations",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"description": "Configuration needed to send logs to LogAnalytics workspace.",
+				"configs": {
+					"spark.synapse.logAnalytics.enabled": "true",
+					"spark.synapse.logAnalytics.workspaceId": "73a0eef5-6ca0-4e23-9c21-4cdfc1168c80",
+					"spark.synapse.logAnalytics.keyVault.name ": "Time-Cartier-DevKV",
+					"spark.synapse.logAnalytics.keyVault.linkedServiceName": "CartierKeyVault",
+					"spark.synapse.logAnalytics.keyVault.key.secret": "LogAnalyticsSecret"
+				},
+				"created": "2023-03-29T14:46:40.8890000-07:00",
+				"createdBy": "alurbina@microsoft.com",
+				"annotations": [],
+				"configMergeRule": {
+					"artifact.currentOperation.spark.synapse.logAnalytics.enabled": "replace",
+					"artifact.currentOperation.spark.synapse.logAnalytics.workspaceId": "replace",
+					"artifact.currentOperation.spark.synapse.logAnalytics.keyVault.name ": "replace",
+					"artifact.currentOperation.spark.synapse.logAnalytics.keyVault.linkedServiceName": "replace",
+					"artifact.currentOperation.spark.synapse.logAnalytics.keyVault.key.secret": "replace"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/albertoPool')]",
+			"type": "Microsoft.Synapse/workspaces/bigDataPools",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"autoPause": {
+					"enabled": true,
+					"delayInMinutes": 15
+				},
+				"autoScale": {
+					"enabled": true,
+					"maxNodeCount": 10,
+					"minNodeCount": 3
+				},
+				"nodeCount": 10,
+				"nodeSize": "Medium",
+				"nodeSizeFamily": "MemoryOptimized",
+				"sparkVersion": "3.3",
+				"isComputeIsolationEnabled": false,
+				"sessionLevelPackagesEnabled": false,
+				"annotations": []
+			},
+			"dependsOn": [],
+			"location": "westus"
+		}
+	]
+}

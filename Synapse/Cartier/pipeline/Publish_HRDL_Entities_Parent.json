@@ -1,0 +1,112 @@
+{
+	"name": "Publish_HRDL_Entities_Parent",
+	"properties": {
+		"activities": [
+			{
+				"name": "Process Delta or Full Or Metadata",
+				"description": "Case statement taking pipeline parameter, JobType, to publish either Delta or Full or Metadata files; executes Full or Delta or Metadata pipelines. Throws error if JobType is neither of these. ",
+				"type": "Switch",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"on": {
+						"value": "@pipeline().parameters.JobType",
+						"type": "Expression"
+					},
+					"cases": [
+						{
+							"value": "Full",
+							"activities": [
+								{
+									"name": "Execute Full Publish",
+									"description": "Executes the Full pipeline to publish Full entities in HRDL.",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "Publish_HRDL_Full_Child",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"FileType": "Full"
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "Delta",
+							"activities": [
+								{
+									"name": "Execute Delta Publish",
+									"description": "Executes the Delta pipeline to publish Delta entities in HRDL.",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "Publish_HRDL_Delta_Child",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"FileType": "Delta"
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "Metadata",
+							"activities": [
+								{
+									"name": "Execute Metadata Publish",
+									"description": "Executes the Full pipeline to publish Metadata entities in HRDL.",
+									"type": "ExecutePipeline",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"pipeline": {
+											"referenceName": "Publish_HRDL_Full_Child",
+											"type": "PipelineReference"
+										},
+										"waitOnCompletion": true,
+										"parameters": {
+											"FileType": "Metadata"
+										}
+									}
+								}
+							]
+						}
+					],
+					"defaultActivities": [
+						{
+							"name": "Type not Recognize Failure",
+							"type": "Fail",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"message": {
+									"value": "@concat(pipeline().parameters.JobType, ' is not a valid type. Pipeline only supports Delta or Full file types.')",
+									"type": "Expression"
+								},
+								"errorCode": "500"
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"JobType": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "WFS/Publish"
+		},
+		"annotations": []
+	}
+}

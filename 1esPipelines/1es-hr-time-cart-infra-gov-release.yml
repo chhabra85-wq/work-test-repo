@@ -1,0 +1,538 @@
+##########################################################################################################################################################################
+#################################################################  Global pipeline settings ##############################################################################
+trigger: none
+name: $(Date:yyyyMMdd).$(Rev:r)
+variables:
+- name: tenantId
+  value: 72f988bf-86f1-41af-91ab-2d7cd011db47
+resources:
+  repositories:
+  - repository: 1ESPipelineTemplates
+    type: git
+    name: 1ESPipelineTemplates/1ESPipelineTemplates
+    ref: refs/tags/release
+extends:
+  template: v1/1ES.Official.PipelineTemplate.yml@1ESPipelineTemplates
+  parameters:
+    pool:
+      name: Azure-Pipelines-1ESPT-ExDShared
+      image: windows-2022
+      os: windows
+    customBuildTags:
+    - ES365AIMigrationTooling-Release
+
+################################################################################################################################################################
+#################################################################  Synapse Build  ##############################################################################
+################################################# builds & produces artificats for Release consumption  ########################################################
+    stages:         
+    - stage: Build_Stage_Synapse                                                
+      jobs:
+      - job: job
+        steps:
+        - task: CredScan@3
+          inputs:
+            debugMode: false
+          condition: succeededOrFailed()
+          displayName: 'Build: Run Credential Scanner'
+
+        - task: Synapse workspace deployment@2
+          displayName: 'Build: Validate Synapse'         
+          inputs:
+            operation: 'validate'
+            ArtifactsFolder: '$(System.DefaultWorkingDirectory)/Synapse/Cartier'
+            azureSubscription: 'MSFT - Workforce Software Integrations -ServiceConnection'
+            ResourceGroupName: 'RG-Cartier-Dev'
+            TargetWorkspaceName: 'synw-time-cartier-dev'
+            DeleteArtifactsNotInTemplate: false
+            DeployManagedPrivateEndpoints: false
+            FailOnMissingOverrides: false
+            Environment: 'prod'
+            npmpackage: 'prod'
+
+        - task: CopyFiles@2
+          displayName: 'Build: Copy InfraDeployment files'
+          inputs:
+            SourceFolder: '$(System.DefaultWorkingDirectory)/InfraDeployment/'
+            Contents: '*'
+            TargetFolder: '$(Build.ArtifactStagingDirectory)/drop/InfraDeployment'
+          
+        - task: CopyFiles@2
+          displayName: 'Build: Copy InfraDeployment Scripts'
+          inputs:
+            SourceFolder: '$(System.DefaultWorkingDirectory)/InfraDeployment/scripts'
+            Contents: '*'
+            TargetFolder: '$(Build.ArtifactStagingDirectory)/drop/scripts'
+
+        - task: CopyFiles@2
+          displayName: 'Build: Copy Template Files'
+          inputs:
+            SourceFolder: '$(System.DefaultWorkingDirectory)/ExportedArtifacts/'
+            Contents: '*'
+            TargetFolder: '$(Build.ArtifactStagingDirectory)/drop'
+
+        - task: 1ES.PublishPipelineArtifact@1
+          displayName: 'Build: Publish Pipeline Artifacts'
+          inputs:
+            targetPath : $(Build.ArtifactStagingDirectory)/drop
+            artifactName: 'drop'
+
+################################################################################################################################################################################
+#################################################################  TESTING Synapse Infra Release  ##############################################################################
+############################################################ release stage into dev for testing only  ##########################################################################   
+    - stage: Test_Inf_Synapse_Infra 
+      displayName: 'Test_Inf_Synapse_Infra'     
+      trigger: manual
+      variables:      
+      - name: environment
+        value: dev
+      - name: keyVaultname
+        value: Inf-Time-Cartier-DevKV
+      - name: resourceGroupName
+        value: RG-Cartier-Dev
+      - name: storageAccountName
+        value: infstrcartierdev
+      - name: icmFunctionName
+        value: inf-cartier-dev-icm-functions
+      - name: synapseWorkspaceName
+        value: inf-synw-time-cartier-dev
+      jobs:
+      - job: Test_Deployment_Approval_Job
+        displayName: 'Test_Deployment_Approval_Job'
+        condition: succeeded()
+        timeoutInMinutes: 0
+        pool: server
+        steps:   
+        - task: ManualValidation@1
+          inputs:
+            notifyUsers: |-
+              payrolldri@microsoft.com
+            approvers: |-
+              payrolldri@microsoft.com
+
+      - job: Test_Infra_Synapse_Infra_Job
+        displayName: Agent job
+        condition: succeeded()
+        timeoutInMinutes: 0
+        templateContext:
+          type: releaseJob
+          isProduction: false
+          inputs:
+          - input: pipelineArtifact
+            artifactName: drop
+            targetPath: $(Pipeline.Workspace)/drop
+        
+        steps:
+        - checkout: none       
+        
+        - task: AzureResourceManagerTemplateDeployment@3
+          displayName: 'ARM Template Release - Subscription scope'
+          inputs:
+            deploymentScope: Subscription
+            ConnectedServiceName: MSFT - Workforce Software Integrations -ServiceConnection
+            subscriptionName: f8a339ea-4445-4d69-a4bb-b7c77c9db241
+            location: West US
+            csmFile: $(Pipeline.Workspace)/drop/InfraDeployment/main.json
+            csmParametersFile: $(Pipeline.Workspace)/drop/InfraDeployment/main.parameters.json
+            overrideParameters: 
+              -azRegion westus 
+              -resourceGroupName $(resourceGroupName) 
+              -appInsightsName InfTestCartierDevAI 
+              -datalakeStorageFilesystem InfCartier 
+              -keyVaultname $(keyVaultname) 
+              -logAnalyticsName inf-log-analytics-cartier-dev 
+              -storageAccountName $(storageAccountName) 
+              -synapseWorkspaceName $(synapseWorkspaceName)
+              -icmFunctionName $(icmFunctionName)
+              -tenantId $(tenantId)
+            addSpnToEnvironment: true
+        
+        - task: AzurePowerShell@5
+          displayName: 'Add IcM IP Address - Inline PowerShsell'
+          inputs:
+            ConnectedServiceNameARM: MSFT - Workforce Software Integrations -ServiceConnection
+            ScriptType: InlineScript
+            Inline: "$keyVault = Get-AzKeyVault -VaultName \"$(keyVaultname)\" -ResourceGroupName \"$(resourceGroupName)\"\n$ipAddresses = (Get-AzWebApp -ResourceGroup \"$(resourceGroupName)\" -name \"$(icmFunctionName)\").PossibleOutboundIpAddresses.Split(\",\")\n\n\n$addAzKeyVaultNetworkRuleSplat = @{\n    VaultName         = $keyVault.VaultName\n    ResourceGroupName = $keyVault.ResourceGroupName\n    IpAddressRange    = $ipAddresses\n}\n\nAdd-AzKeyVaultNetworkRule @addAzKeyVaultNetworkRuleSplat "
+            TargetAzurePs: LatestVersion
+        
+        - task: AzurePowerShell@5
+          displayName: 'Update cartierpool dependencies - Inline PowerShell'
+          inputs:
+            ConnectedServiceNameARM: MSFT - Workforce Software Integrations -ServiceConnection
+            ScriptType: InlineScript
+            Inline: |
+              Write-Host "Getting cartierpool from $env:synapseWorkspaceName for updates"
+              $pool = Get-AzSynapseSparkPool -WorkspaceName $env:synapseWorkspaceName -Name cartierpool
+              
+              Write-Host "Updating cartierpool's requirements file"
+              $pool | Update-AzSynapseSparkPool -LibraryRequirementsFilePath $(Pipeline.Workspace)/drop/InfraDeployment/requirements.txt
+              Write-Host "Completed cartierpool's updates"
+            TargetAzurePs: LatestVersion
+        
+        - task: UsePythonVersion@0
+          displayName: 'Install Python 3.x'
+          inputs:
+            versionSpec: '3.x'
+
+        - task: AzureCLI@2
+          displayName: 'Populate storage tables - Python Script'
+          inputs:
+            connectedServiceNameARM: MSFT - Workforce Software Integrations -ServiceConnection
+            scriptType: bash
+            scriptLocation: inlineScript
+            inlineScript: |-
+              echo "Starting updating storage tables with default values task"
+              
+              echo "Installing requirements to run Python scripts"
+              python --version
+              pip install -r $PIPELINE_WORKSPACE/drop/scripts/requirements.txt
+
+              echo "Updating table with default values"
+              python $PIPELINE_WORKSPACE/drop/scripts/populate_table.py $PIPELINE_WORKSPACE/drop/scripts/default_values.json "$(storageAccountName)" $servicePrincipalId $servicePrincipalKey $(tenantId)
+              echo "Completed updating storage tables with default values task"
+            addSpnToEnvironment: true
+
+############################################################################################################################################################################
+#################################################################  DEV Synapse Infra Release  ##############################################################################
+######################################################### release stage into dev for initial dev infra  ####################################################################
+    - stage: Dev_Synapse_Infra 
+      displayName: 'Dev_Synapse_Infra'
+      trigger: manual
+      variables:      
+      - name: environment
+        value: dev
+      - name: keyVaultname
+        value: Time-Cartier-DevKV
+      - name: resourceGroupName
+        value: RG-Cartier-Dev
+      - name: storageAccountName
+        value: strcartierdev
+      - name: icmFunctionName
+        value: cartier-dev-icm-functions
+      - name: synapseWorkspaceName
+        value: synw-time-cartier-dev
+      jobs:
+      - job: Dev_Deployment_Approval_Job
+        displayName: 'Dev_Deployment_Approval_Job'
+        condition: succeeded()
+        timeoutInMinutes: 0
+        pool: server
+        steps:   
+        - task: ManualValidation@1
+          inputs:
+            notifyUsers: |-
+              payrolldri@microsoft.com
+            approvers: |-
+              payrolldri@microsoft.com      
+      
+      - job: Dev_Synapse_Infra_Job
+        displayName: Agent job
+        condition: succeeded()
+        timeoutInMinutes: 0
+        templateContext:
+          type: releaseJob
+          isProduction: false
+          inputs:
+          - input: pipelineArtifact
+            artifactName: drop
+            targetPath: $(Pipeline.Workspace)/drop
+        
+        steps:
+        - checkout: none             
+        
+        - task: AzureResourceManagerTemplateDeployment@3
+          displayName: 'ARM Template Release - Subscription scope'
+          inputs:
+            deploymentScope: Subscription
+            ConnectedServiceName: MSFT - Workforce Software Integrations -ServiceConnection
+            subscriptionName: f8a339ea-4445-4d69-a4bb-b7c77c9db241
+            location: West US
+            csmFile: $(Pipeline.Workspace)/drop/InfraDeployment/main.json
+            csmParametersFile: $(Pipeline.Workspace)/drop/InfraDeployment/main.parameters.json
+            overrideParameters: 
+              -azRegion westus 
+              -resourceGroupName $(resourceGroupName) 
+              -appInsightsName CartierDevAI 
+              -datalakeStorageFilesystem Cartier 
+              -keyVaultname $(keyVaultname) 
+              -logAnalyticsName log-analytics-cartier-dev 
+              -storageAccountName $(storageAccountName) 
+              -synapseWorkspaceName $(synapseWorkspaceName)
+              -icmFunctionName $(icmFunctionName)
+              -tenantId $(tenantId)
+            addSpnToEnvironment: true
+        
+        - task: AzurePowerShell@5
+          displayName: 'Add IcM IP Address - Inline PowerShsell'
+          inputs:
+            ConnectedServiceNameARM: MSFT - Workforce Software Integrations -ServiceConnection
+            ScriptType: InlineScript
+            Inline: "$keyVault = Get-AzKeyVault -VaultName \"$(keyVaultname)\" -ResourceGroupName \"$(resourceGroupName)\"\n$ipAddresses = (Get-AzWebApp -ResourceGroup \"$(resourceGroupName)\" -name \"$(icmFunctionName)\").PossibleOutboundIpAddresses.Split(\",\")\n\n\n$addAzKeyVaultNetworkRuleSplat = @{\n    VaultName         = $keyVault.VaultName\n    ResourceGroupName = $keyVault.ResourceGroupName\n    IpAddressRange    = $ipAddresses\n}\n\nAdd-AzKeyVaultNetworkRule @addAzKeyVaultNetworkRuleSplat "
+            TargetAzurePs: LatestVersion
+        
+        - task: AzurePowerShell@5
+          displayName: 'Update cartierpool dependencies - Inline PowerShell'
+          inputs:
+            ConnectedServiceNameARM: MSFT - Workforce Software Integrations -ServiceConnection
+            ScriptType: InlineScript
+            Inline: |
+              Write-Host "Getting cartierpool from $env:synapseWorkspaceName for updates"
+              $pool = Get-AzSynapseSparkPool -WorkspaceName $env:synapseWorkspaceName -Name cartierpool
+              
+              Write-Host "Updating cartierpool's requirements file"
+              $pool | Update-AzSynapseSparkPool -LibraryRequirementsFilePath $(Pipeline.Workspace)/drop/InfraDeployment/requirements.txt
+              Write-Host "Completed cartierpool's updates"
+            TargetAzurePs: LatestVersion
+        
+        - task: UsePythonVersion@0
+          displayName: 'Install Python 3.x'
+          inputs:
+            versionSpec: '3.x'
+
+        - task: AzureCLI@2
+          displayName: 'Populate storage tables - Python Script'
+          inputs:
+            connectedServiceNameARM: MSFT - Workforce Software Integrations -ServiceConnection
+            scriptType: bash
+            scriptLocation: inlineScript
+            inlineScript: |-
+              echo "Starting updating storage tables with default values task"
+              
+              echo "Installing requirements to run Python scripts"
+              python --version
+              pip install -r $PIPELINE_WORKSPACE/drop/scripts/requirements.txt
+
+              echo "Updating table with default values"
+              python $PIPELINE_WORKSPACE/drop/scripts/populate_table.py $PIPELINE_WORKSPACE/drop/scripts/default_values.json "$(storageAccountName)" $servicePrincipalId $servicePrincipalKey $(tenantId)
+              echo "Completed updating storage tables with default values task"
+            addSpnToEnvironment: true
+
+############################################################################################################################################################################        
+#################################################################  PPE Synapse Infra Release  ##############################################################################
+######################################################### release stage into ppe for initial dev infra  ####################################################################    
+    - stage: Ppe_Synapse_Infra 
+      displayName: 'Ppe_Synapse_Infra'      
+      trigger: manual
+      variables:      
+      - name: environment
+        value: ppe
+      - name: keyVaultname
+        value: Time-Cartier-PpeKV
+      - name: resourceGroupName
+        value: RG-Cartier-Ppe
+      - name: storageAccountName
+        value: strcartierppe
+      - name: icmFunctionName
+        value: cartier-ppe-icm-functions
+      - name: synapseWorkspaceName
+        value: synw-time-cartier-ppe
+      jobs:
+      - job: Ppe_Deployment_Approval_Job
+        displayName: 'Ppe_Deployment_Approval_Job'
+        condition: succeeded()
+        timeoutInMinutes: 0
+        pool: server
+        steps:   
+        - task: ManualValidation@1
+          inputs:
+            notifyUsers: |-
+              payrolldri@microsoft.com
+            approvers: |-
+              payrolldri@microsoft.com      
+      
+      - job: Ppe_Synapse_Infra_Job
+        displayName: Agent job
+        condition: succeeded()
+        timeoutInMinutes: 0
+        templateContext:
+          type: releaseJob
+          isProduction: false
+          inputs:
+          - input: pipelineArtifact
+            artifactName: drop
+            targetPath: $(Pipeline.Workspace)/drop
+        
+        steps:
+        - checkout: none       
+
+        - task: AzureResourceManagerTemplateDeployment@3
+          displayName: 'ARM Template Release - Subscription scope'
+          inputs:
+            deploymentScope: Subscription
+            ConnectedServiceName: MSFT - Workforce Software Integrations -ServiceConnection
+            subscriptionName: f8a339ea-4445-4d69-a4bb-b7c77c9db241
+            location: West US
+            csmFile: $(Pipeline.Workspace)/drop/InfraDeployment/main.json
+            csmParametersFile: $(Pipeline.Workspace)/drop/InfraDeployment/main.parameters.json
+            overrideParameters: 
+              -azRegion westus 
+              -resourceGroupName $(resourceGroupName) 
+              -appInsightsName CartierPpeAI 
+              -datalakeStorageFilesystem Cartier 
+              -keyVaultname $(keyVaultname) 
+              -logAnalyticsName log-analytics-cartier-ppe 
+              -storageAccountName $(storageAccountName) 
+              -synapseWorkspaceName $(synapseWorkspaceName)
+              -icmFunctionName $(icmFunctionName)
+              -tenantId $(tenantId)
+            addSpnToEnvironment: true
+        
+        - task: AzurePowerShell@5
+          displayName: 'Add IcM IP Address - Inline PowerShsell'
+          inputs:
+            ConnectedServiceNameARM: MSFT - Workforce Software Integrations -ServiceConnection
+            ScriptType: InlineScript
+            Inline: "$keyVault = Get-AzKeyVault -VaultName \"$(keyVaultname)\" -ResourceGroupName \"$(resourceGroupName)\"\n$ipAddresses = (Get-AzWebApp -ResourceGroup \"$(resourceGroupName)\" -name \"$(icmFunctionName)\").PossibleOutboundIpAddresses.Split(\",\")\n\n\n$addAzKeyVaultNetworkRuleSplat = @{\n    VaultName         = $keyVault.VaultName\n    ResourceGroupName = $keyVault.ResourceGroupName\n    IpAddressRange    = $ipAddresses\n}\n\nAdd-AzKeyVaultNetworkRule @addAzKeyVaultNetworkRuleSplat "
+            TargetAzurePs: LatestVersion
+        
+        - task: AzurePowerShell@5
+          displayName: 'Update cartierpool dependencies - Inline PowerShell'
+          inputs:
+            ConnectedServiceNameARM: MSFT - Workforce Software Integrations -ServiceConnection
+            ScriptType: InlineScript
+            Inline: |
+              Write-Host "Getting cartierpool from $env:synapseWorkspaceName for updates"
+              $pool = Get-AzSynapseSparkPool -WorkspaceName $env:synapseWorkspaceName -Name cartierpool
+              
+              Write-Host "Updating cartierpool's requirements file"
+              $pool | Update-AzSynapseSparkPool -LibraryRequirementsFilePath $(Pipeline.Workspace)/drop/InfraDeployment/requirements.txt
+              Write-Host "Completed cartierpool's updates"
+            TargetAzurePs: LatestVersion
+        
+        - task: UsePythonVersion@0
+          displayName: 'Install Python 3.x'
+          inputs:
+            versionSpec: '3.x'
+
+        - task: AzureCLI@2
+          displayName: 'Populate storage tables - Python Script'
+          inputs:
+            connectedServiceNameARM: MSFT - Workforce Software Integrations -ServiceConnection
+            scriptType: bash
+            scriptLocation: inlineScript
+            inlineScript: |-
+              echo "Starting updating storage tables with default values task"
+              
+              echo "Installing requirements to run Python scripts"
+              python --version
+              pip install -r $PIPELINE_WORKSPACE/drop/scripts/requirements.txt
+
+              echo "Updating table with default values"
+              python $PIPELINE_WORKSPACE/drop/scripts/populate_table.py $PIPELINE_WORKSPACE/drop/scripts/default_values.json "$(storageAccountName)" $servicePrincipalId $servicePrincipalKey $(tenantId)
+              echo "Completed updating storage tables with default values task"
+            addSpnToEnvironment: true
+        
+############################################################################################################################################################################        
+#################################################################  PROD Synapse Infra Release  #############################################################################
+######################################################### release stage into prod for initial dev infra  ####################################################################        
+    - stage: Prod_Synapse_Infra 
+      displayName: 'Prod_Synapse_Infra'   
+      trigger: manual
+      variables:      
+      - name: environment
+        value: prod
+      - name: keyVaultname
+        value: Time-Cartier-ProdKV
+      - name: resourceGroupName
+        value: RG-Cartier-Prod
+      - name: storageAccountName
+        value: strcartierprod
+      - name: icmFunctionName
+        value: cartier-prod-icm-functions
+      - name: synapseWorkspaceName
+        value: synw-time-cartier-prod
+      
+      jobs:      
+      - job: Prod_Deployment_Approval_Job
+        displayName: 'Prod_Deployment_Approval_Job'
+        condition: succeeded()
+        timeoutInMinutes: 0
+        pool: server
+        steps:   
+        - task: ManualValidation@1
+          inputs:
+            notifyUsers: |-
+              payrolldri@microsoft.com
+            approvers: |-
+              payrolldri@microsoft.com
+
+      - job: Prod_Synapse_Infra_Job
+        displayName: Agent job
+        condition: succeeded()
+        timeoutInMinutes: 0
+        templateContext:
+          type: releaseJob
+          isProduction: true
+          inputs:
+          - input: pipelineArtifact
+            artifactName: drop
+            targetPath: $(Pipeline.Workspace)/drop
+        
+        steps:
+        - checkout: none          
+        
+        - task: AzureResourceManagerTemplateDeployment@3
+          displayName: 'ARM Template Release - Subscription scope'
+          inputs:
+            deploymentScope: Subscription
+            ConnectedServiceName: MSFT - Workforce Software Integrations -ServiceConnection
+            subscriptionName: f8a339ea-4445-4d69-a4bb-b7c77c9db241
+            location: West US
+            csmFile: $(Pipeline.Workspace)/drop/InfraDeployment/main.json
+            csmParametersFile: $(Pipeline.Workspace)/drop/InfraDeployment/main.parameters.json
+            overrideParameters: 
+              -azRegion westus 
+              -resourceGroupName $(resourceGroupName) 
+              -appInsightsName CartierProdAI 
+              -datalakeStorageFilesystem Cartier 
+              -keyVaultname $(keyVaultname) 
+              -logAnalyticsName log-analytics-cartier-prod 
+              -storageAccountName $(storageAccountName) 
+              -synapseWorkspaceName $(synapseWorkspaceName)
+              -icmFunctionName $(icmFunctionName)
+              -tenantId $(tenantId)
+            addSpnToEnvironment: true
+        
+        - task: AzurePowerShell@5
+          displayName: 'Add IcM IP Address - Inline PowerShsell'
+          inputs:
+            ConnectedServiceNameARM: MSFT - Workforce Software Integrations -ServiceConnection
+            ScriptType: InlineScript
+            Inline: "$keyVault = Get-AzKeyVault -VaultName \"$(keyVaultname)\" -ResourceGroupName \"$(resourceGroupName)\"\n$ipAddresses = (Get-AzWebApp -ResourceGroup \"$(resourceGroupName)\" -name \"$(icmFunctionName)\").PossibleOutboundIpAddresses.Split(\",\")\n\n\n$addAzKeyVaultNetworkRuleSplat = @{\n    VaultName         = $keyVault.VaultName\n    ResourceGroupName = $keyVault.ResourceGroupName\n    IpAddressRange    = $ipAddresses\n}\n\nAdd-AzKeyVaultNetworkRule @addAzKeyVaultNetworkRuleSplat "
+            TargetAzurePs: LatestVersion
+        
+        - task: AzurePowerShell@5
+          displayName: 'Update cartierpool dependencies - Inline PowerShell'
+          inputs:
+            ConnectedServiceNameARM: MSFT - Workforce Software Integrations -ServiceConnection
+            ScriptType: InlineScript
+            Inline: |
+              Write-Host "Getting cartierpool from $env:synapseWorkspaceName for updates"
+              $pool = Get-AzSynapseSparkPool -WorkspaceName $env:synapseWorkspaceName -Name cartierpool
+              
+              Write-Host "Updating cartierpool's requirements file"
+              $pool | Update-AzSynapseSparkPool -LibraryRequirementsFilePath $(Pipeline.Workspace)/drop/InfraDeployment/requirements.txt
+              Write-Host "Completed cartierpool's updates"
+            TargetAzurePs: LatestVersion
+        
+        - task: UsePythonVersion@0
+          displayName: 'Install Python 3.x'
+          inputs:
+            versionSpec: '3.x'
+
+        - task: AzureCLI@2
+          displayName: 'Populate storage tables - Python Script'
+          inputs:
+            connectedServiceNameARM: MSFT - Workforce Software Integrations -ServiceConnection
+            scriptType: bash
+            scriptLocation: inlineScript
+            inlineScript: |-
+              echo "Starting updating storage tables with default values task"
+              
+              echo "Installing requirements to run Python scripts"
+              python --version
+              pip install -r $PIPELINE_WORKSPACE/drop/scripts/requirements.txt
+
+              echo "Updating table with default values"
+              python $PIPELINE_WORKSPACE/drop/scripts/populate_table.py $PIPELINE_WORKSPACE/drop/scripts/default_values.json "$(storageAccountName)" $servicePrincipalId $servicePrincipalKey $(tenantId)
+              echo "Completed updating storage tables with default values task"
+            addSpnToEnvironment: true

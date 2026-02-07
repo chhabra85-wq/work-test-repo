@@ -1,0 +1,113 @@
+{
+	"name": "helper_schema_transform_unit_tests",
+	"properties": {
+		"folder": {
+			"name": "tests/test_notebooks"
+		},
+		"nbformat": 4,
+		"nbformat_minor": 2,
+		"bigDataPool": {
+			"referenceName": "devpoolv34",
+			"type": "BigDataPoolReference"
+		},
+		"sessionProperties": {
+			"driverMemory": "112g",
+			"driverCores": 16,
+			"executorMemory": "112g",
+			"executorCores": 16,
+			"numExecutors": 2,
+			"conf": {
+				"spark.dynamicAllocation.enabled": "false",
+				"spark.dynamicAllocation.minExecutors": "2",
+				"spark.dynamicAllocation.maxExecutors": "2",
+				"spark.autotune.trackingId": "afb1f0d3-85e9-43b1-b7f3-59dbcb921ddc"
+			}
+		},
+		"metadata": {
+			"saveOutput": true,
+			"enableDebugMode": true,
+			"kernelspec": {
+				"name": "synapse_pyspark",
+				"display_name": "Synapse PySpark"
+			},
+			"language_info": {
+				"name": "python"
+			},
+			"a365ComputeOptions": {
+				"id": "/subscriptions/f8a339ea-4445-4d69-a4bb-b7c77c9db241/resourceGroups/RG-Cartier-Dev/providers/Microsoft.Synapse/workspaces/synw-time-cartier-dev/bigDataPools/devpool",
+				"name": "devpoolv34",
+				"type": "Spark",
+				"endpoint": "https://synw-time-cartier-dev.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/devpool",
+				"auth": {
+					"type": "AAD",
+					"authResource": "https://dev.azuresynapse.net"
+				},
+				"sparkVersion": "3.3",
+				"nodeCount": 10,
+				"cores": 16,
+				"memory": 112,
+				"automaticScaleJobs": false
+			},
+			"sessionKeepAliveTimeout": 30
+		},
+		"cells": [
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"import pytest\r\n",
+					"from pyspark.sql.types import StructField, StructType, StringType\r\n",
+					"import unittest\r\n",
+					"\r\n",
+					"class TestHelperSchemaTransformUnit(SparkSessionBaseClass):\r\n",
+					"\r\n",
+					"    def setUp(self):\r\n",
+					"        super().setUp()\r\n",
+					"\r\n",
+					"    def test_add_index_column(self):\r\n",
+					"        data = [(\"Apple\", \"Fruit\"),\r\n",
+					"                (\"Orange\", \"Fruit\"),\r\n",
+					"                (\"Banana\", \"Fruit\")]\r\n",
+					"        schema = StructType([\r\n",
+					"            StructField(\"Name\", StringType(), True),\r\n",
+					"            StructField(\"Type\", StringType(), True)\r\n",
+					"        ])\r\n",
+					"        df = self.spark_session.createDataFrame(data, schema)\r\n",
+					"\r\n",
+					"        # Instantiate class\r\n",
+					"        transformer = SchemaTransformer()\r\n",
+					"        result_df = transformer.add_index_column(df, 0, 'Index')\r\n",
+					"\r\n",
+					"        # ASSERTS\r\n",
+					"        assert result_df.count() == len(data), f\"Expected row count to be {len(data)}, result was {result_df.count()}.\"\r\n",
+					"        assert len(result_df.columns) == 3, f\"Expected columns to be {len(df.columns) + 1}, result was {len(result_df.columns)}.\"\r\n",
+					"        assert 'Index' in result_df.columns, f\"Expected Index column to be added, result was none.\"\r\n",
+					"\r\n",
+					"        # add assert values for first row\r\n",
+					"        first_row_result_df = result_df.filter((result_df[\"Name\"] == \"Apple\")).collect()[0] # [\"Apple\", \"Fruit\", \"0\"]\r\n",
+					"        assert first_row_result_df.Name == \"Apple\", f\"Expected col Name to be Apple, result was {first_row_result_df.Name}.\"\r\n",
+					"        assert first_row_result_df.Type == \"Fruit\", f\"Expected col Type to be Fruit, result was {first_row_result_df.Type}.\"\r\n",
+					"        assert first_row_result_df.Index == 0, f\"Expected col Index to be 0, result was {first_row_result_df.Index}.\"\r\n",
+					"        # add assert values for last row\r\n",
+					"        first_row_result_df = result_df.filter((result_df[\"Name\"] == \"Banana\")).collect()[0] # [\"Banana\", \"Fruit\", \"2\"]\r\n",
+					"        assert first_row_result_df.Name == \"Banana\", f\"Expected col Name to be Banana, result was {first_row_result_df.Name}.\"\r\n",
+					"        assert first_row_result_df.Type == \"Fruit\", f\"Expected col Type to be Fruit, result was {first_row_result_df.Type}.\"\r\n",
+					"        assert first_row_result_df.Index == 2, f\"Expected col Index to be 2, result was {first_row_result_df.Index}.\"\r\n",
+					"\r\n",
+					""
+				],
+				"execution_count": 2
+			}
+		]
+	}
+}

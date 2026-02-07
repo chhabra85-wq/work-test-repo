@@ -1,0 +1,53 @@
+{
+	"name": "CartierBlobDelimitedText",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "CartierBlobStorage",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"Directory": {
+				"type": "string"
+			},
+			"FileName": {
+				"type": "string"
+			},
+			"Container": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "DelimitedText",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobStorageLocation",
+				"fileName": {
+					"value": "@dataset().FileName",
+					"type": "Expression"
+				},
+				"folderPath": {
+					"value": "@dataset().Directory",
+					"type": "Expression"
+				},
+				"container": {
+					"value": "@dataset().Container",
+					"type": "Expression"
+				}
+			},
+			"columnDelimiter": ",",
+			"escapeChar": "\\",
+			"firstRowAsHeader": true,
+			"quoteChar": "\""
+		},
+		"schema": [
+			{
+				"name": "PAR1\u0015\u0000\u0015�\u0010\u0015�\b",
+				"type": "String"
+			},
+			{
+				"name": "\u0015D\u0015\u0000\u0015\u0006\u0015\b\u001c\u0018\u0013MSFT_YOUTH_HOL_DAYS\u0018\u0013AS_OT_ACCEPTED_BANK\u0016\u0000\u0000\u0000\u0000�\b�\u0002\u0000\u0000\u0000D\u0001\u001c\u0000\u0000\u0000MSFT_ALLOWED_UNPAID_VAC_DAYS\u0015\u0015 $NNIVERSARY\u0005\u0019\u001590EMP_VOLUNTEER\u0005\u001b\u0014_BANK\u0019\u001198EXT_LEG_ACCRUAL\u0005\"\u0000\u001b>\u001d\u0000\u0018CARRYOV",
+				"type": "String"
+			}
+		]
+	}
+}

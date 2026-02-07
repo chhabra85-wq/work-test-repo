@@ -1,0 +1,23 @@
+{
+	"name": "ICMConnector",
+	"properties": {
+		"annotations": [],
+		"type": "AzureFunction",
+		"typeProperties": {
+			"functionAppUrl": "https://cartier-dev-icm-functions.azurewebsites.net",
+			"functionKey": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "CartierKeyVault",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "ICMConnectorFunctionAppKey"
+			},
+			"authentication": "Anonymous"
+		},
+		"connectVia": {
+			"referenceName": "AutoResolveIntegrationRuntime",
+			"type": "IntegrationRuntimeReference"
+		}
+	}
+}

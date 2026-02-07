@@ -1,0 +1,92 @@
+{
+	"name": "helper_table_storage_client_unit_tests",
+	"properties": {
+		"folder": {
+			"name": "tests/test_notebooks"
+		},
+		"nbformat": 4,
+		"nbformat_minor": 2,
+		"bigDataPool": {
+			"referenceName": "devpoolv34",
+			"type": "BigDataPoolReference"
+		},
+		"sessionProperties": {
+			"driverMemory": "112g",
+			"driverCores": 16,
+			"executorMemory": "112g",
+			"executorCores": 16,
+			"numExecutors": 2,
+			"conf": {
+				"spark.dynamicAllocation.enabled": "false",
+				"spark.dynamicAllocation.minExecutors": "2",
+				"spark.dynamicAllocation.maxExecutors": "2",
+				"spark.autotune.trackingId": "1d75561b-0271-4d1c-b768-989f9e1980fc"
+			}
+		},
+		"metadata": {
+			"saveOutput": true,
+			"enableDebugMode": false,
+			"kernelspec": {
+				"name": "synapse_pyspark",
+				"display_name": "Synapse PySpark"
+			},
+			"language_info": {
+				"name": "python"
+			},
+			"a365ComputeOptions": {
+				"id": "/subscriptions/f8a339ea-4445-4d69-a4bb-b7c77c9db241/resourceGroups/RG-Cartier-Dev/providers/Microsoft.Synapse/workspaces/synw-time-cartier-dev/bigDataPools/devpool",
+				"name": "devpoolv34",
+				"type": "Spark",
+				"endpoint": "https://synw-time-cartier-dev.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/devpool",
+				"auth": {
+					"type": "AAD",
+					"authResource": "https://dev.azuresynapse.net"
+				},
+				"sparkVersion": "3.3",
+				"nodeCount": 10,
+				"cores": 16,
+				"memory": 112,
+				"automaticScaleJobs": false
+			},
+			"sessionKeepAliveTimeout": 30
+		},
+		"cells": [
+			{
+				"cell_type": "code",
+				"source": [
+					"from azure.data.tables import TableServiceClient\r\n",
+					"from unittest.mock import Mock, MagicMock, ANY\r\n",
+					"from pyspark.sql import DataFrame\r\n",
+					"\r\n",
+					"\r\n",
+					"class TestHelperTableStorageClientUnit(SparkSessionBaseClass):\r\n",
+					"    def setUp(self):\r\n",
+					"        super().setUp()\r\n",
+					"        self.mock_table_service_client = MagicMock(spec=AzureTableServiceClient)\r\n",
+					"        self.mock_table_client = MagicMock()\r\n",
+					"        self.mock_table_service_client.get_table_client.return_value = self.mock_table_client\r\n",
+					"\r\n",
+					"        self.azure_table_client = AzureTableClient(self.mock_table_service_client, self.spark_session)\r\n",
+					"\r\n",
+					"\r\n",
+					"    def test_fetch_all_rowkey_values(self):\r\n",
+					"        mock_entity1 = TableEntity(PartitionKey=\"PAY_CODE\", RowKey=\"BANK_CLEAR\", ENTRY_FIELD=\"HOURS\", IsProcessing=False)\r\n",
+					"        mock_entity2 = TableEntity(PartitionKey=\"PAY_CODE\", RowKey=\"PAID_TIME\", ENTRY_FIELD=\"DAYS\", IsProcessing=False)\r\n",
+					"        mock_entities = [mock_entity1, mock_entity2]\r\n",
+					"        expected_result = {\"BANK_CLEAR\": \"HOURS\", \"PAID_TIME\": \"DAYS\"}\r\n",
+					"\r\n",
+					"        self.mock_table_client.query_entities.return_value = mock_entities\r\n",
+					"\r\n",
+					"        table_name = \"yourTableName\"\r\n",
+					"        table_query = \"IsProcessing eq false\"\r\n",
+					"        result_df = self.azure_table_client.get_all_table_entities_with_query_df(table_name, table_query)\r\n",
+					"\r\n",
+					"        # Assert\r\n",
+					"        assert result_df.count() == 2\r\n",
+					"        assert isinstance(result_df, DataFrame)"
+				],
+				"execution_count": 1
+			}
+		]
+	}
+}

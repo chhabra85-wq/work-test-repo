@@ -1,0 +1,341 @@
+{
+	"name": "ingest_runners_data_to_storage",
+	"properties": {
+		"folder": {
+			"name": "ingestion/runners"
+		},
+		"nbformat": 4,
+		"nbformat_minor": 2,
+		"bigDataPool": {
+			"referenceName": "devpoolv34",
+			"type": "BigDataPoolReference"
+		},
+		"sessionProperties": {
+			"driverMemory": "112g",
+			"driverCores": 16,
+			"executorMemory": "112g",
+			"executorCores": 16,
+			"numExecutors": 2,
+			"conf": {
+				"spark.dynamicAllocation.enabled": "false",
+				"spark.dynamicAllocation.minExecutors": "2",
+				"spark.dynamicAllocation.maxExecutors": "2",
+				"spark.autotune.trackingId": "1c6a9c1c-3d28-471f-9813-dfbbcbdc8748"
+			}
+		},
+		"metadata": {
+			"saveOutput": true,
+			"enableDebugMode": true,
+			"kernelspec": {
+				"name": "synapse_pyspark",
+				"display_name": "Synapse PySpark"
+			},
+			"language_info": {
+				"name": "python"
+			},
+			"a365ComputeOptions": {
+				"id": "/subscriptions/f8a339ea-4445-4d69-a4bb-b7c77c9db241/resourceGroups/RG-Cartier-Dev/providers/Microsoft.Synapse/workspaces/synw-time-cartier-dev/bigDataPools/devpool",
+				"name": "devpoolv34",
+				"type": "Spark",
+				"endpoint": "https://synw-time-cartier-dev.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/devpool",
+				"auth": {
+					"type": "AAD",
+					"authResource": "https://dev.azuresynapse.net"
+				},
+				"sparkVersion": "3.3",
+				"nodeCount": 10,
+				"cores": 16,
+				"memory": 112,
+				"automaticScaleJobs": false
+			},
+			"sessionKeepAliveTimeout": 30
+		},
+		"cells": [
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					},
+					"tags": [
+						"parameters"
+					]
+				},
+				"source": [
+					"api_name = \"\"\r\n",
+					"run_id = \"\"\r\n",
+					"run_execution_time = \"\"\r\n",
+					"api_host_name = \"\"\r\n",
+					"version = \"\"\r\n",
+					"record_count_to_request = \"\""
+				],
+				"execution_count": 43
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"# # Un-Comment for local run as parameters are passed via ADF Pipeline\r\n",
+					"\r\n",
+					"# import uuid\r\n",
+					"# from datetime import datetime, timezone\r\n",
+					"\r\n",
+					"# api_name = \"\"\r\n",
+					"# api_host_name = \"https://api-us8.wfs.cloud\"\r\n",
+					"# run_id = str(uuid.uuid4())\r\n",
+					"# run_execution_time =  datetime.now(timezone.utc).strftime(\"%Y-%m-%dT%H:%M:%S.%fZ\")\r\n",
+					"# version = \"v1\"\r\n",
+					"# record_count_to_request = \"10000\"\r\n",
+					"\r\n",
+					"params = { \"api_name\": api_name, \"run_execution_time\": run_execution_time, \"run_id\": run_id, \"api_host_name\": api_host_name, \"version\": version, \"record_count_to_request\": record_count_to_request }"
+				],
+				"execution_count": 44
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"%run runners/runners_base_setup"
+				],
+				"execution_count": 45
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"%run ingestion/utilities/generate_auth_token"
+				],
+				"execution_count": 46
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"%run ingestion/utilities/table_storage_actions"
+				],
+				"execution_count": 47
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"%run ingestion/utilities/flattened_nested_json"
+				],
+				"execution_count": 48
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"%run config/data_configs"
+				],
+				"execution_count": 49
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"%run helpers/helper_data_configs"
+				],
+				"execution_count": 50
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"%run validation/validation_engine"
+				],
+				"execution_count": 51
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"%run ingestion/utilities/process_api_response"
+				],
+				"execution_count": 52
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"%run ingestion/logics/ingestion_logic_api_data_retriever"
+				],
+				"execution_count": 53
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"# Set up requests session\r\n",
+					"session = requests.Session()\r\n",
+					"\r\n",
+					"# Set up authentication endpoint\r\n",
+					"auth_endpoint = keyvault_client.get(\"WFSAuthUrl\")\r\n",
+					"\r\n",
+					"# Set up authentication credentials\r\n",
+					"client_id = keyvault_client.get(\"WFSClientID\")\r\n",
+					"client_secret = keyvault_client.get(\"WFSClientCredential\")"
+				],
+				"execution_count": 54
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"telemetry_client = container.telemetry_client(run_id, f\"{api_name}-ingestion\", run_execution_time)\r\n",
+					"\r\n",
+					"table_actions = AzureTableActions(table_service_client, telemetry_client, params=params)\r\n",
+					"flatten_instance = FlattenNestedJson(delimiter=\"_\")\r\n",
+					"validation_engine = ValidationEngine(telemetry_client, params, datalake_client)\r\n",
+					"data_type_with_underscore = api_name.replace(\"-\", \"_\")\r\n",
+					"data_configs_helper = DataConfigsHelper(DataConfigs, f\"{data_type_with_underscore}_config\")\r\n",
+					"\r\n",
+					"token_authenticator = TokenAuthenticator(auth_endpoint, client_id, client_secret, telemetry_client)\r\n",
+					"\r\n",
+					"api_processor =  ApiProcessor(\r\n",
+					"    spark_session, \r\n",
+					"    params, \r\n",
+					"    telemetry_client, \r\n",
+					"    datalake_client, \r\n",
+					"    table_service_client, \r\n",
+					"    schema_transformer, \r\n",
+					"    flatten_instance,\r\n",
+					"    validation_engine,\r\n",
+					"    data_configs_helper)\r\n",
+					"\r\n",
+					"api_retriever = ApiDataRetriever(params=params, table_actions=table_actions, telemetry_client=telemetry_client, table_service_client=table_service_client, api_processor=api_processor, token_authenticator=token_authenticator)\r\n",
+					"\r\n",
+					"api_retriever.retrieve_data_from_api()"
+				],
+				"execution_count": 55
+			}
+		]
+	}
+}

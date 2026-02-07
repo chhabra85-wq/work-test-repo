@@ -1,0 +1,26 @@
+{
+	"name": "LOA_BCP_Prudential_Trigger",
+	"properties": {
+		"description": "This triggers the LOA_BCP_Prudential_DatFlow_Parent every hour to consume file from WFS and send data to BCP.",
+		"annotations": [],
+		"runtimeState": "Stopped",
+		"pipelines": [
+			{
+				"pipelineReference": {
+					"referenceName": "LOA_BCP_Prudential_DataFlow_Parent",
+					"type": "PipelineReference"
+				}
+			}
+		],
+		"type": "ScheduleTrigger",
+		"typeProperties": {
+			"recurrence": {
+				"frequency": "Hour",
+				"interval": 1,
+				"startTime": "2024-05-29T20:32:00",
+				"endTime": "2031-12-31T20:32:00",
+				"timeZone": "Pacific Standard Time"
+			}
+		}
+	}
+}

@@ -1,0 +1,257 @@
+{
+	"name": "data_config_unit_tests",
+	"properties": {
+		"folder": {
+			"name": "tests/test_notebooks"
+		},
+		"nbformat": 4,
+		"nbformat_minor": 2,
+		"bigDataPool": {
+			"referenceName": "devpoolv34",
+			"type": "BigDataPoolReference"
+		},
+		"sessionProperties": {
+			"driverMemory": "112g",
+			"driverCores": 16,
+			"executorMemory": "112g",
+			"executorCores": 16,
+			"numExecutors": 2,
+			"conf": {
+				"spark.dynamicAllocation.enabled": "false",
+				"spark.dynamicAllocation.minExecutors": "2",
+				"spark.dynamicAllocation.maxExecutors": "2",
+				"spark.autotune.trackingId": "a46466e0-af2a-4a94-b673-1cafdb4718e4"
+			}
+		},
+		"metadata": {
+			"saveOutput": true,
+			"enableDebugMode": true,
+			"kernelspec": {
+				"name": "synapse_pyspark",
+				"display_name": "Synapse PySpark"
+			},
+			"language_info": {
+				"name": "python"
+			},
+			"a365ComputeOptions": {
+				"id": "/subscriptions/f8a339ea-4445-4d69-a4bb-b7c77c9db241/resourceGroups/RG-Cartier-Dev/providers/Microsoft.Synapse/workspaces/synw-time-cartier-dev/bigDataPools/devpool",
+				"name": "devpoolv34",
+				"type": "Spark",
+				"endpoint": "https://synw-time-cartier-dev.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/devpool",
+				"auth": {
+					"type": "AAD",
+					"authResource": "https://dev.azuresynapse.net"
+				},
+				"sparkVersion": "3.3",
+				"nodeCount": 10,
+				"cores": 16,
+				"memory": 112,
+				"automaticScaleJobs": false
+			},
+			"sessionKeepAliveTimeout": 30
+		},
+		"cells": [
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"### **Test notebook for the data_configs notebook** \r\n",
+					"- test is executed in the test_runner notebook"
+				]
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"**Instantiate data_config test dependencies**"
+				]
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"%run config/data_configs"
+				],
+				"execution_count": 37
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"%run helpers/helper_data_configs"
+				],
+				"execution_count": 38
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"%run tests/spark_session_base"
+				],
+				"execution_count": null
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"**Test values in data_configs**\r\n",
+					"- converts config data into json\r\n",
+					"- asserts each property has expected result; in doing so ensuring data_config is properly set\r\n",
+					"- **each newly added config needs to have a supporting unit test**\r\n",
+					""
+				]
+			},
+			{
+				"cell_type": "code",
+				"source": [
+					"import json\r\n",
+					"import unittest\r\n",
+					"from pyspark.sql.types import StructType, StructField, StringType\r\n",
+					"\r\n",
+					"class TestDataConfigHelper(SparkSessionBaseClass):\r\n",
+					"    def setup(self):\r\n",
+					"        super().setup()\r\n",
+					"        \r\n",
+					"    def test_shift_config_values(self):\r\n",
+					"        \"\"\"\r\n",
+					"        Asserts config values for shift_config are correct\r\n",
+					"        \"\"\"    \r\n",
+					"\r\n",
+					"        # ARRANGE\r\n",
+					"        expected_shift_primary_key_expr = \"CASE WHEN dataChange = 'DELETE' THEN CONCAT_WS('_', externalMatchId, workDate) ELSE CONCAT_WS('_', externalMatchId, workDate) END\"\r\n",
+					"        expected_shift_scientific_notation_conversion = \"CASE WHEN timeRecords_hours RLIKE '[Ee]' THEN (FORMAT_NUMBER(CAST(timeRecords_hours AS DOUBLE), 5)) ELSE timeRecords_hours END\"\r\n",
+					"        expected_shift_bronze_initial_schema = { \"externalMatchId\": \"StringType()\", \"dataChange\": \"StringType()\", \"workDate\": \"StringType()\", \"recordId\": \"StringType()\" }\r\n",
+					"        expected_shift_bronze_col_rules = { \"columnIsNotNull\": { \"targetColumns\": [\"dataChange\", \"externalMatchId\", \"workDate\", \"recordId\", \"cursor\", \"ingestionTime\", \"bronze_index\"], \"ruleExpression\": \"column_name IS NOT NULL\", \"ruleExpressionType\": \"PySpark.DataFrame.Filter(str)\" }}\r\n",
+					"        expected_shift_silver_col_rules = { \"columnIsNotNull\": { \"targetColumns\": [\"dataChange\", \"externalMatchId\", \"bronze_index\", \"workDate\", \"recordId\"], \"ruleExpression\": \"column_name IS NOT NULL\", \"ruleExpressionType\": \"PySpark.DataFrame.Filter(str)\" }}\r\n",
+					"        expected_shift_silver_finalized_schema = { \"externalMatchId\" : \"externalMatchId\", \"shifts_shiftId\" : \"shifts_shiftId\", \"workDate\" : \"workDate\", \"shifts_endAt\" : \"shifts_endAt\", \"shifts_startAt\" : \"shifts_startAt\", \"shifts_activities_activityId\" : \"shifts_activities_activityId\", \"shifts_activities_startAt\" : \"shifts_activities_startAt\", \"shifts_activities_endAt\" : \"shifts_activities_endAt\", \"shifts_activities_task\" : \"shifts_activities_task\", \"bronze_index\": \"bronze_index\", \"gold_index\": \"gold_index\", \"isDeleted\": \"isDeleted\", \"dataChange\": \"dataChange\", \"recordId\": \"recordId\" }\r\n",
+					"        expected_shift_silver_initial_schema = { \"externalMatchId\": \"StringType()\", \"bronze_index\": \"IntegerType()\", \"workDate\": \"StringType()\", \"dataChange\": \"StringType()\", \"recordId\": \"StringType()\" }\r\n",
+					"\r\n",
+					"        # ACT\r\n",
+					"        data_configs_helper = DataConfigsHelper(DataConfigs, \"shift_config\")\r\n",
+					"\r\n",
+					"        shift_bronze_primary_key_result = data_configs_helper.get_data_primary_key()\r\n",
+					"        shift_bronze_validation_df_rules_init_schema = data_configs_helper.get_bronze_validation_df_rules_init_schema()\r\n",
+					"        shift_bronze_col_rules_result = data_configs_helper.get_bronze_validation_column_rules()\r\n",
+					"        shift_scientific_notation_conversion_result = data_configs_helper.get_scientific_notation_conversion()\r\n",
+					"        shift_silver_col_rules_result = data_configs_helper.get_silver_validation_column_rules()\r\n",
+					"        shift_silver_finalized_schema_result = data_configs_helper.get_silver_finalized_schema()\r\n",
+					"        shift_silver_validation_df_rules_init_schema = data_configs_helper.get_silver_validation_df_rules_init_schema()\r\n",
+					"\r\n",
+					"        # ASSERT\r\n",
+					"        assert shift_bronze_primary_key_result == expected_shift_primary_key_expr, f\"Expected values for shift.primaryKeyExp are incorrect.\"\r\n",
+					"        assert shift_bronze_validation_df_rules_init_schema == expected_shift_bronze_initial_schema, f\"Expected values for shift.bronze.validationDataframeRules.initialSchema are incorrect.\"\r\n",
+					"        assert shift_bronze_col_rules_result == expected_shift_bronze_col_rules, f\"Expected values for shift.bronze.validationColumnRules are incorrect.\"\r\n",
+					"        assert shift_scientific_notation_conversion_result == expected_shift_scientific_notation_conversion, f\"Expected values for shift.scientificNotationConversionExpr are incorrect.\"\r\n",
+					"        assert shift_silver_col_rules_result == expected_shift_silver_col_rules, f\"Expected values for shift.silver.validationColumnRules are incorrect.\"\r\n",
+					"        assert shift_silver_finalized_schema_result == expected_shift_silver_finalized_schema, f\"Expected values for shift.silver.finalizedSchemaMapping are incorrect.\"\r\n",
+					"        assert shift_silver_validation_df_rules_init_schema == expected_shift_silver_initial_schema, f\"Expected values for shift.silver.validationDataframeRules.initialSchema are incorrect.\"\r\n",
+					"\r\n",
+					"    def test_calculated_time_config_values(self):\r\n",
+					"        \"\"\"\r\n",
+					"        Asserts config values for calculated_time_config are correct\r\n",
+					"        \"\"\"    \r\n",
+					"\r\n",
+					"        # ARRANGE\r\n",
+					"        expected_calculated_time_primary_key_expr = \"CASE WHEN dataChange = 'DELETE' THEN CONCAT_WS('_', externalMatchId, workDate) ELSE CONCAT_WS('_', externalMatchId, timeRecords_workDate) END\"\r\n",
+					"        expected_calculated_time_scientific_notation_conversion = \"CASE WHEN timeRecords_hours RLIKE '[Ee]' THEN (FORMAT_NUMBER(CAST(timeRecords_hours AS DOUBLE), 5)) ELSE timeRecords_hours END\"\r\n",
+					"        expected_calculated_time_bronze_initial_schema = { \"externalMatchId\": \"StringType()\", \"dataChange\": \"StringType()\", \"workDate\": \"StringType()\", \"recordId\": \"StringType()\" }\r\n",
+					"        expected_calculated_time_bronze_col_rules = { \"columnIsNotNull\": { \"targetColumns\": [\"dataChange\", \"externalMatchId\", \"workDate\", \"recordId\", \"cursor\", \"ingestionTime\", \"bronze_index\"], \"ruleExpression\": \"column_name IS NOT NULL\", \"ruleExpressionType\": \"PySpark.DataFrame.Filter(str)\" }}\r\n",
+					"        expected_calculated_time_silver_col_rules = { \"columnIsNotNull\": { \"targetColumns\": [\"dataChange\", \"externalMatchId\", \"bronze_index\", \"workDate\", \"recordId\"], \"ruleExpression\": \"column_name IS NOT NULL\", \"ruleExpressionType\": \"PySpark.DataFrame.Filter(str)\" }}\r\n",
+					"        expected_calculated_time_silver_finalized_schema = { \"bronze_index\": \"bronze_index\", \"externalMatchId\" : \"externalMatchId\", \"workDate\" : \"workDate\", \"timeRecords_startTimestamp\" : \"timeRecords_startTimestamp\", \"timeRecords_endTimestamp\" : \"timeRecords_endTimestamp\", \"timeRecords_payCode\" : \"timeRecords_payCode\", \"timeRecords_hours\" : \"timeRecords_hours\", \"timeRecords_grossPay\" : \"timeRecords_grossPay\", \"timeRecords_additionalFields_DAYS_OFF\" : \"timeRecords_additionalFields_DAYS_OFF\", \"status\" : \"status\", \"value\" : \"Value\", \"unit\" : \"Unit\", \"timeRecords_workDate\" : \"timeRecords_workDate\", \"timeRecords_additionalFields_SP_EARNINGS_CODE\" : \"timeRecords_additionalFields_SP_EARNINGS_CODE\", \"gold_index\": \"gold_index\", \"isDeleted\": \"isDeleted\", \"dataChange\": \"dataChange\", \"recordId\": \"recordId\" }\r\n",
+					"        expected_calculated_time_silver_initial_schema = { \"dataChange\": \"StringType()\", \"externalMatchId\": \"StringType()\", \"bronze_index\": \"IntegerType()\", \"workDate\": \"StringType()\", \"recordId\": \"StringType()\" }\r\n",
+					"\r\n",
+					"        # ACT\r\n",
+					"        data_configs_helper = DataConfigsHelper(DataConfigs, \"calculated_time_config\")\r\n",
+					"\r\n",
+					"        calculated_time_bronze_primary_key_result = data_configs_helper.get_data_primary_key()\r\n",
+					"        calculated_time_bronze_validation_df_rules_init_schema = data_configs_helper.get_bronze_validation_df_rules_init_schema()\r\n",
+					"        calculated_time_bronze_col_rules_result = data_configs_helper.get_bronze_validation_column_rules()\r\n",
+					"        calculated_time_scientific_notation_conversion_result = data_configs_helper.get_scientific_notation_conversion()\r\n",
+					"        calculated_time_silver_col_rules_result = data_configs_helper.get_silver_validation_column_rules()\r\n",
+					"        calculated_time_silver_finalized_schema_result = data_configs_helper.get_silver_finalized_schema()\r\n",
+					"        calculated_time_silver_validation_df_rules_init_schema = data_configs_helper.get_silver_validation_df_rules_init_schema()\r\n",
+					"\r\n",
+					"        # ASSERT\r\n",
+					"        assert calculated_time_bronze_primary_key_result == expected_calculated_time_primary_key_expr, f\"Expected values for calculated_time.primaryKeyExp are incorrect.\"\r\n",
+					"        assert calculated_time_bronze_validation_df_rules_init_schema == expected_calculated_time_bronze_initial_schema, f\"Expected values for calculated_time.bronze.validationDataframeRules.initialSchema are incorrect.\"\r\n",
+					"        assert calculated_time_bronze_col_rules_result == expected_calculated_time_bronze_col_rules, f\"Expected values for calculated_time.silver.validationColumnRules are incorrect.\"\r\n",
+					"        assert calculated_time_scientific_notation_conversion_result == expected_calculated_time_scientific_notation_conversion, f\"Expected values for calculated_time.scientificNotationConversionExpr are incorrect.\"\r\n",
+					"        assert calculated_time_silver_col_rules_result == expected_calculated_time_silver_col_rules, f\"Expected values for calculated_time.silver.validationColumnRules are incorrect.\"\r\n",
+					"        assert calculated_time_silver_finalized_schema_result == expected_calculated_time_silver_finalized_schema, f\"Expected values for calculated_time.silver.finalizedSchemaMapping are incorrect.\"\r\n",
+					"        assert calculated_time_silver_validation_df_rules_init_schema == expected_calculated_time_silver_initial_schema, f\"Expected values for calculated_time.silver.validationDataframeRules.initialSchema are incorrect.\"\r\n",
+					"\r\n",
+					"    def test_update_df_column_names(self):\r\n",
+					"        # Arrange\r\n",
+					"        schema = StructType([\r\n",
+					"            StructField(\"a\", StringType(), nullable=False),\r\n",
+					"            StructField(\"b\", StringType(), nullable=False),\r\n",
+					"            StructField(\"c\", StringType(), nullable=False)\r\n",
+					"        ])\r\n",
+					"        data = [(\"value_one_a\", \"value_one_b\", \"value_one_c\"), (\"value_two_a\", \"value_two_b\", \"value_two_c\")]\r\n",
+					"        original_df = self.spark_session.createDataFrame(data, schema)\r\n",
+					"        \r\n",
+					"        schema_dict = { \"x\": \"a\", \"y\": \"b\", \"c\": \"c\" }\r\n",
+					"        expected_columns = list(schema_dict.keys())\r\n",
+					"\r\n",
+					"        data_configs_helper = DataConfigsHelper(DataConfigs, \"shift_config\")\r\n",
+					"\r\n",
+					"        # ACT\r\n",
+					"        result_df = data_configs_helper.update_df_column_names(original_df, schema_dict)\r\n",
+					"\r\n",
+					"        # ASSERT\r\n",
+					"        assert result_df.columns == expected_columns, f\"Expected renamed columns do not match.\"\r\n",
+					"        assert result_df.count() == 2, f\"Expected renamed dataframe is incorrect.\""
+				],
+				"execution_count": 39
+			}
+		]
+	}
+}

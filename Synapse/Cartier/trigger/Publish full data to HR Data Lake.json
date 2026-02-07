@@ -1,0 +1,25 @@
+{
+	"name": "Publish full data to HR Data Lake",
+	"properties": {
+		"description": "This trigger is linked to the pipeline that publishes already prepared 'full files' from local DL storage to specific folders under HR Datalake's publish/TR01 path.",
+		"annotations": [],
+		"runtimeState": "Started",
+		"pipelines": [
+			{
+				"pipelineReference": {
+					"referenceName": "Publish_WFS_Full_Data_Parent",
+					"type": "PipelineReference"
+				}
+			}
+		],
+		"type": "ScheduleTrigger",
+		"typeProperties": {
+			"recurrence": {
+				"frequency": "Hour",
+				"interval": 12,
+				"startTime": "2023-09-13T18:00:00",
+				"timeZone": "Pacific Standard Time"
+			}
+		}
+	}
+}

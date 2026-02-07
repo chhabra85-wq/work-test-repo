@@ -1,0 +1,124 @@
+{
+	"name": "hrdl_delta_file_queue_entity",
+	"properties": {
+		"folder": {
+			"name": "models/table_entities"
+		},
+		"nbformat": 4,
+		"nbformat_minor": 2,
+		"bigDataPool": {
+			"referenceName": "devpoolv34",
+			"type": "BigDataPoolReference"
+		},
+		"sessionProperties": {
+			"driverMemory": "112g",
+			"driverCores": 16,
+			"executorMemory": "112g",
+			"executorCores": 16,
+			"numExecutors": 2,
+			"conf": {
+				"spark.dynamicAllocation.enabled": "false",
+				"spark.dynamicAllocation.minExecutors": "2",
+				"spark.dynamicAllocation.maxExecutors": "2",
+				"spark.autotune.trackingId": "d48c7133-d840-428b-9220-f503b79216eb"
+			}
+		},
+		"metadata": {
+			"saveOutput": true,
+			"enableDebugMode": true,
+			"kernelspec": {
+				"name": "synapse_pyspark",
+				"display_name": "python"
+			},
+			"language_info": {
+				"name": "python"
+			},
+			"a365ComputeOptions": {
+				"id": "/subscriptions/f8a339ea-4445-4d69-a4bb-b7c77c9db241/resourceGroups/RG-Cartier-Dev/providers/Microsoft.Synapse/workspaces/synw-time-cartier-dev/bigDataPools/devpool",
+				"name": "devpoolv34",
+				"type": "Spark",
+				"endpoint": "https://synw-time-cartier-dev.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/devpool",
+				"auth": {
+					"type": "AAD",
+					"authResource": "https://dev.azuresynapse.net"
+				},
+				"sparkVersion": "3.3",
+				"nodeCount": 10,
+				"cores": 16,
+				"memory": 112,
+				"automaticScaleJobs": false
+			},
+			"sessionKeepAliveTimeout": 30
+		},
+		"cells": [
+			{
+				"cell_type": "code",
+				"source": [
+					"class HRDLDeltaFileQueueEntity():\r\n",
+					"    \"\"\"Class model for the HRDLDeltaFileQueue table\"\"\"\r\n",
+					"    def __init__(\r\n",
+					"            self, \r\n",
+					"            partition_key,\r\n",
+					"            row_key,\r\n",
+					"            is_published, \r\n",
+					"            data_path,\r\n",
+					"            handshake_path,\r\n",
+					"            destination_data_path,\r\n",
+					"            destination_handshake_path,\r\n",
+					"            file_type\r\n",
+					"        ):\r\n",
+					"        self.partition_key = partition_key\r\n",
+					"        self.row_key = row_key\r\n",
+					"        self.is_published  = is_published \r\n",
+					"        self.data_path = data_path\r\n",
+					"        self.handshake_path = handshake_path\r\n",
+					"        self.destination_data_path = destination_data_path\r\n",
+					"        self.destination_handshake_path = destination_handshake_path\r\n",
+					"        self.file_type = file_type\r\n",
+					"\r\n",
+					"    @classmethod\r\n",
+					"    def from_dict(cls, entity_dict):\r\n",
+					"        \"\"\"\r\n",
+					"        Takes in an api metadata dictionary and returns a constructed api metadata class\r\n",
+					"\r\n",
+					"            Parameters:\r\n",
+					"            data (Dict): dictionary containing class values as key value paris\r\n",
+					"\r\n",
+					"            Returns:\r\n",
+					"            constructed class\r\n",
+					"        \"\"\"           \r\n",
+					"        return cls(\r\n",
+					"            partition_key = entity_dict.get('PartitionKey'),\r\n",
+					"            row_key = entity_dict.get('RowKey'),\r\n",
+					"            is_published = entity_dict.get('IsPublished'),\r\n",
+					"            data_path = entity_dict.get('DataPath'),\r\n",
+					"            handshake_path = entity_dict.get('HandshakePath'),\r\n",
+					"            destination_data_path = entity_dict.get('DestinationDataPath'),\r\n",
+					"            destination_handshake_path = entity_dict.get('DestinationHandshakePath'),\r\n",
+					"            file_type = entity_dict.get('FileType')\r\n",
+					"        )\r\n",
+					"\r\n",
+					"    def to_dict(self):\r\n",
+					"        \"\"\"\r\n",
+					"        Converts api metadata class to a dictionary\r\n",
+					"        Create & Update Table operations only accept a dictionary\r\n",
+					"\r\n",
+					"            Returns:\r\n",
+					"            dictionary with class values\r\n",
+					"        \"\"\"    \r\n",
+					"        return {\r\n",
+					"            \"PartitionKey\": self.partition_key,\r\n",
+					"            \"RowKey\": self.row_key,\r\n",
+					"            \"IsPublished\": self.is_published,\r\n",
+					"            \"DataPath\": self.data_path,\r\n",
+					"            \"HandshakePath\": self.handshake_path,\r\n",
+					"            \"DestinationDataPath\": self.destination_data_path,\r\n",
+					"            \"DestinationHandshakePath\": self.destination_handshake_path,\r\n",
+					"            \"FileType\": self.file_type\r\n",
+					"        }        "
+				],
+				"execution_count": null
+			}
+		]
+	}
+}

@@ -1,0 +1,681 @@
+{
+	"name": "LOA_BCP_Prudential_DataFlow_Child",
+	"properties": {
+		"description": "This pipeline pulls LOA data from WFS Sftp and sends it to BCP to further process to Prudential for STD Leave Claims.",
+		"activities": [
+			{
+				"name": "Copy LOA files from WFS",
+				"description": "Copy files from WFS sftp for LOA Cases and place it in local storage account staging container.",
+				"type": "Copy",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.01:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "DelimitedTextSource",
+						"storeSettings": {
+							"type": "SftpReadSettings",
+							"recursive": true,
+							"wildcardFileName": "prudential*",
+							"enablePartitionDiscovery": false,
+							"disableChunking": false
+						},
+						"formatSettings": {
+							"type": "DelimitedTextReadSettings"
+						}
+					},
+					"sink": {
+						"type": "DelimitedTextSink",
+						"storeSettings": {
+							"type": "AzureBlobStorageWriteSettings"
+						},
+						"formatSettings": {
+							"type": "DelimitedTextWriteSettings",
+							"quoteAllText": true,
+							"fileExtension": ".csv"
+						}
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"mappings": [
+							{
+								"source": {
+									"name": "caseID",
+									"type": "String",
+									"physicalType": "String"
+								},
+								"sink": {
+									"name": "caseID",
+									"type": "String",
+									"physicalType": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "startDate",
+									"type": "String",
+									"physicalType": "String"
+								},
+								"sink": {
+									"name": "startDate",
+									"type": "String",
+									"physicalType": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "endDate",
+									"type": "String",
+									"physicalType": "String"
+								},
+								"sink": {
+									"name": "endDate",
+									"type": "String",
+									"physicalType": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "lastDayWorked",
+									"type": "String",
+									"physicalType": "String"
+								},
+								"sink": {
+									"name": "lastDayWorked",
+									"type": "String",
+									"physicalType": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "leaveTypes",
+									"type": "String",
+									"physicalType": "String"
+								},
+								"sink": {
+									"name": "leaveTypes",
+									"type": "String",
+									"physicalType": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "workCompIndicator",
+									"type": "String",
+									"physicalType": "String"
+								},
+								"sink": {
+									"name": "workCompIndicator",
+									"type": "String",
+									"physicalType": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "employeeId",
+									"type": "String",
+									"physicalType": "String"
+								},
+								"sink": {
+									"name": "employeeId",
+									"type": "String",
+									"physicalType": "String"
+								}
+							},
+							{
+								"source": {
+									"name": "pfmlBalance",
+									"type": "String",
+									"physicalType": "String"
+								},
+								"sink": {
+									"name": "pfmlBalance",
+									"physicalType": "String"
+								}
+							}
+						],
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "WfsPrudentialData",
+						"type": "DatasetReference"
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "WFSCsvFiles",
+						"type": "DatasetReference",
+						"parameters": {
+							"Container": "wfs-loa-extracts-staging"
+						}
+					}
+				]
+			},
+			{
+				"name": "ForEach LOA File",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Get List of File Names",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Get List of File Names').output.childItems",
+						"type": "Expression"
+					},
+					"isSequential": false,
+					"activities": [
+						{
+							"name": "Delete Sftp LOA File",
+							"description": "Delete LOA File from WFS Sftp Location",
+							"type": "Delete",
+							"dependsOn": [
+								{
+									"activity": "Delete Json File",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.01:00:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"dataset": {
+									"referenceName": "WfsPrudentialData",
+									"type": "DatasetReference"
+								},
+								"enableLogging": false,
+								"storeSettings": {
+									"type": "SftpReadSettings",
+									"recursive": false,
+									"wildcardFileName": {
+										"value": "@item().name",
+										"type": "Expression"
+									},
+									"enablePartitionDiscovery": false,
+									"disableChunking": false
+								}
+							}
+						},
+						{
+							"name": "Read LOA File Content",
+							"description": "Read LOA csv File Content.",
+							"type": "Lookup",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.01:00:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "DelimitedTextSource",
+									"storeSettings": {
+										"type": "AzureBlobStorageReadSettings",
+										"recursive": true,
+										"enablePartitionDiscovery": false
+									},
+									"formatSettings": {
+										"type": "DelimitedTextReadSettings"
+									}
+								},
+								"dataset": {
+									"referenceName": "CartierBlobDelimitedText",
+									"type": "DatasetReference",
+									"parameters": {
+										"Directory": "@coalesce(null)",
+										"FileName": "@item().name",
+										"Container": "wfs-loa-extracts-staging"
+									}
+								},
+								"firstRowOnly": false
+							}
+						},
+						{
+							"name": "If File has records",
+							"description": "Check if the LOA file from WFS have any rows.",
+							"type": "IfCondition",
+							"dependsOn": [
+								{
+									"activity": "Read LOA File Content",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"expression": {
+									"value": "@greater(activity('Read LOA File Content').output.count,0)",
+									"type": "Expression"
+								},
+								"ifTrueActivities": [
+									{
+										"name": "Read Json File Content",
+										"type": "Lookup",
+										"dependsOn": [
+											{
+												"activity": "TransformCsvToJson",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "0.01:00:00",
+											"retry": 2,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"source": {
+												"type": "JsonSource",
+												"storeSettings": {
+													"type": "AzureBlobStorageReadSettings",
+													"recursive": true,
+													"enablePartitionDiscovery": false
+												},
+												"formatSettings": {
+													"type": "JsonReadSettings"
+												}
+											},
+											"dataset": {
+												"referenceName": "CartierBlobJsonFile",
+												"type": "DatasetReference",
+												"parameters": {
+													"Directory": "@coalesce(null)",
+													"FileName": {
+														"value": "@replace(item().name,'.csv','.json')",
+														"type": "Expression"
+													},
+													"Container": "wfs-loa-extracts-staging"
+												}
+											},
+											"firstRowOnly": false
+										}
+									},
+									{
+										"name": "Call BCP end point",
+										"description": "Send the request to BCP logic app end point.",
+										"type": "WebActivity",
+										"dependsOn": [
+											{
+												"activity": "Read Json File Content",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "0.01:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"method": "POST",
+											"headers": {
+												"Content-Type": "application/json"
+											},
+											"url": "https://prod-19.westus2.logic.azure.com:443/workflows/478e9818ef0343119a72007c3fbda603/triggers/manual/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0",
+											"connectVia": {
+												"referenceName": "AutoResolveIntegrationRuntime",
+												"type": "IntegrationRuntimeReference"
+											},
+											"body": {
+												"value": "@activity('Read Json File Content').output.value",
+												"type": "Expression"
+											},
+											"authentication": {
+												"resource": "https://management.azure.com/",
+												"credential": {
+													"referenceName": "HRDLCredentialsUserAssignedMI",
+													"type": "CredentialReference"
+												},
+												"type": "UserAssignedManagedIdentity"
+											}
+										}
+									},
+									{
+										"name": "TransformCsvToJson",
+										"description": "Transform the LOA Csv file from WFS to Json object expected by BCP logic app endpoint.",
+										"type": "ExecuteDataFlow",
+										"dependsOn": [],
+										"policy": {
+											"timeout": "0.01:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"dataflow": {
+												"referenceName": "DataflowLOAJsonOutput",
+												"type": "DataFlowReference",
+												"parameters": {
+													"FileName": {
+														"value": "'@{item().name}'",
+														"type": "Expression"
+													}
+												},
+												"datasetParameters": {
+													"ReadWFSLoaCsvFile": {
+														"Container": "wfs-loa-extracts-staging"
+													},
+													"CreateJsonFile": {
+														"Directory": "@coalesce(null)",
+														"FileName": {
+															"value": "@item().name",
+															"type": "Expression"
+														},
+														"Container": "wfs-loa-extracts-staging"
+													}
+												}
+											},
+											"compute": {
+												"coreCount": 8,
+												"computeType": "General"
+											},
+											"traceLevel": "None",
+											"cacheSinks": {
+												"firstRowOnly": true
+											}
+										}
+									},
+									{
+										"name": "Delete Failed Json File",
+										"description": "Delete Failed  Json File from staging container.",
+										"type": "Delete",
+										"dependsOn": [
+											{
+												"activity": "Call BCP end point",
+												"dependencyConditions": [
+													"Failed"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "0.01:00:00",
+											"retry": 2,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"dataset": {
+												"referenceName": "CartierBlobJsonFile",
+												"type": "DatasetReference",
+												"parameters": {
+													"Directory": "@coalesce(null)",
+													"FileName": {
+														"value": "@replace(item().name,'.csv','.json')",
+														"type": "Expression"
+													},
+													"Container": "wfs-loa-extracts-staging"
+												}
+											},
+											"enableLogging": false,
+											"storeSettings": {
+												"type": "AzureBlobStorageReadSettings",
+												"recursive": true,
+												"enablePartitionDiscovery": false
+											}
+										}
+									},
+									{
+										"name": "Failing the pipeline",
+										"type": "Fail",
+										"dependsOn": [
+											{
+												"activity": "Delete Failed Json File",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"userProperties": [],
+										"typeProperties": {
+											"message": "Pipeline failed when calling BCP endpoint.",
+											"errorCode": "500"
+										}
+									}
+								]
+							}
+						},
+						{
+							"name": "Delete Staging LOA File",
+							"description": "Delete LOA File from staging container",
+							"type": "Delete",
+							"dependsOn": [
+								{
+									"activity": "Archive LOA file",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.01:00:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"dataset": {
+									"referenceName": "CartierBlobDelimitedText",
+									"type": "DatasetReference",
+									"parameters": {
+										"Directory": "@coalesce(null)",
+										"FileName": "@item().name",
+										"Container": "wfs-loa-extracts-staging"
+									}
+								},
+								"enableLogging": false,
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								}
+							}
+						},
+						{
+							"name": "Delete Json File",
+							"description": "Delete Json File from staging container.",
+							"type": "Delete",
+							"dependsOn": [
+								{
+									"activity": "Delete Staging LOA File",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.01:00:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"dataset": {
+									"referenceName": "CartierBlobJsonFile",
+									"type": "DatasetReference",
+									"parameters": {
+										"Directory": "@coalesce(null)",
+										"FileName": {
+											"value": "@replace(item().name,'.csv','.json')",
+											"type": "Expression"
+										},
+										"Container": "wfs-loa-extracts-staging"
+									}
+								},
+								"enableLogging": false,
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								}
+							}
+						},
+						{
+							"name": "Archive LOA file",
+							"description": "Archive the processed file to archive folder.",
+							"type": "Copy",
+							"dependsOn": [
+								{
+									"activity": "If File has records",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.01:00:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "DelimitedTextSource",
+									"storeSettings": {
+										"type": "SftpReadSettings",
+										"recursive": true,
+										"wildcardFileName": "@item().name",
+										"enablePartitionDiscovery": false,
+										"disableChunking": false
+									},
+									"formatSettings": {
+										"type": "DelimitedTextReadSettings"
+									}
+								},
+								"sink": {
+									"type": "DelimitedTextSink",
+									"storeSettings": {
+										"type": "AzureBlobStorageWriteSettings",
+										"copyBehavior": "PreserveHierarchy"
+									},
+									"formatSettings": {
+										"type": "DelimitedTextWriteSettings",
+										"quoteAllText": true,
+										"fileExtension": ".txt"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "WfsPrudentialData",
+									"type": "DatasetReference"
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "CartierBlobDelimitedText",
+									"type": "DatasetReference",
+									"parameters": {
+										"Directory": "@coalesce(null)",
+										"FileName": "@item().name",
+										"Container": "wfs-loa-extracts-archive"
+									}
+								}
+							]
+						}
+					]
+				}
+			},
+			{
+				"name": "Get List of File Names",
+				"description": "Get LOA File Names from the storage container.",
+				"type": "GetMetadata",
+				"dependsOn": [
+					{
+						"activity": "Copy LOA files from WFS",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.01:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "WFSCsvFiles",
+						"type": "DatasetReference",
+						"parameters": {
+							"Container": "wfs-loa-extracts-staging"
+						}
+					},
+					"fieldList": [
+						"childItems"
+					],
+					"storeSettings": {
+						"type": "AzureBlobStorageReadSettings",
+						"recursive": true,
+						"enablePartitionDiscovery": false
+					},
+					"formatSettings": {
+						"type": "DelimitedTextReadSettings"
+					}
+				}
+			}
+		],
+		"folder": {
+			"name": "WFS-BCP-Prudential"
+		},
+		"annotations": []
+	}
+}

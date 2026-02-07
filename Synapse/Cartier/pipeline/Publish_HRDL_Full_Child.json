@@ -1,0 +1,539 @@
+{
+	"name": "Publish_HRDL_Full_Child",
+	"properties": {
+		"activities": [
+			{
+				"name": "Get Full Entities for Publishing",
+				"description": "Makes a call to HRDLFilePublishDetails  to attain full entity data to publish to HRDL. Filters on IsPublished is false RowKey is Full or Metadata.",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.01:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 60,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureTableSource",
+						"azureTableSourceQuery": {
+							"value": "RowKey eq '@{pipeline().parameters.FileType}' and IsPublished eq false and (RowKey eq 'Full' or RowKey eq 'Metadata')",
+							"type": "Expression"
+						},
+						"azureTableSourceIgnoreTableNotFound": false
+					},
+					"dataset": {
+						"referenceName": "CartierTableStorage",
+						"type": "DatasetReference",
+						"parameters": {
+							"StorageAccountName": "strcartierdev",
+							"TableName": "HRDLFilePublishDetails"
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "Publish each Full Entity",
+				"description": "Iterates through Full entities and publishes entity data; both latest file & handshake are published in HRDL.",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Get Full Entities for Publishing",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Get Full Entities for Publishing').output.value",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "Set SourceDataPath",
+							"description": "Sets the SourceDataPath param from column 'LatestSourceDataPath'.",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"policy": {
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "SourceLatestSourceDataPath",
+								"value": {
+									"value": "@item().LatestSourceDataPath",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Publish full Entity",
+							"description": "Publishing full entity latest data into HRDL.",
+							"type": "Copy",
+							"dependsOn": [
+								{
+									"activity": "Set PublishDataPath",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								},
+								{
+									"activity": "Set EntityType",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								},
+								{
+									"activity": "Set HRDLFolderPath",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.01:00:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "ParquetSource",
+									"storeSettings": {
+										"type": "AzureBlobFSReadSettings",
+										"recursive": false,
+										"wildcardFolderPath": {
+											"value": "@variables('SourceLatestSourceDataPath')",
+											"type": "Expression"
+										},
+										"wildcardFileName": "*",
+										"enablePartitionDiscovery": false
+									},
+									"formatSettings": {
+										"type": "ParquetReadSettings"
+									}
+								},
+								"sink": {
+									"type": "ParquetSink",
+									"storeSettings": {
+										"type": "AzureBlobFSWriteSettings",
+										"copyBehavior": "PreserveHierarchy"
+									},
+									"formatSettings": {
+										"type": "ParquetWriteSettings"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "CartierDatalakeParquet",
+									"type": "DatasetReference",
+									"parameters": {
+										"FileSystem": {
+											"value": "cartier/",
+											"type": "Expression"
+										},
+										"Directory": {
+											"value": "@variables('SourceLatestSourceDataPath')",
+											"type": "Expression"
+										},
+										"FileName": {
+											"value": "@coalesce(null)",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "HRDLParquet",
+									"type": "DatasetReference",
+									"parameters": {
+										"FileSystem": "publish",
+										"Directory": {
+											"value": "@substring(variables('PublishDataPath'), 0, lastIndexOf(variables('PublishDataPath'), '/'))",
+											"type": "Expression"
+										},
+										"FileName": {
+											"value": "@last(split(variables('PublishDataPath'), '/'))",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "Publish full Handshake",
+							"description": "Publishes full entity latest handshake into HRDL.",
+							"type": "Copy",
+							"dependsOn": [
+								{
+									"activity": "Publish full Entity",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.01:00:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "ParquetSource",
+									"storeSettings": {
+										"type": "AzureBlobFSReadSettings",
+										"recursive": false,
+										"wildcardFolderPath": {
+											"value": "@variables('SourceLatestHandshakePath')",
+											"type": "Expression"
+										},
+										"wildcardFileName": "*",
+										"enablePartitionDiscovery": false
+									},
+									"formatSettings": {
+										"type": "ParquetReadSettings"
+									}
+								},
+								"sink": {
+									"type": "ParquetSink",
+									"storeSettings": {
+										"type": "AzureBlobFSWriteSettings",
+										"copyBehavior": "PreserveHierarchy"
+									},
+									"formatSettings": {
+										"type": "ParquetWriteSettings"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "CartierDatalakeParquet",
+									"type": "DatasetReference",
+									"parameters": {
+										"FileSystem": "cartier/",
+										"Directory": {
+											"value": "@variables('SourceLatestHandshakePath')",
+											"type": "Expression"
+										},
+										"FileName": {
+											"value": "@coalesce(null)",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "HRDLParquet",
+									"type": "DatasetReference",
+									"parameters": {
+										"FileSystem": "publish",
+										"Directory": {
+											"value": "@substring(variables('PublishHandShakePath'), 0, lastIndexOf(variables('PublishHandShakePath'), '/'))",
+											"type": "Expression"
+										},
+										"FileName": {
+											"value": "@last(split(variables('PublishHandShakePath'), '/'))",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "Set SourceHandshake",
+							"description": "Sets the SourceHandshake param from column 'LatestHandshakePath' & adds const Handshake file name: {EntityNameHandhsake}.",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"policy": {
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "SourceLatestHandshakePath",
+								"value": {
+									"value": "@concat(item().LatestHandshakePath, '/', item().PartitionKey, 'Handshake.snappy.parquet')",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Update HRDLFilePublishDetails",
+							"description": "Updates HRDLFilePublishDetails table with latest destination paths & sets IsPublished to true.",
+							"type": "WebActivity",
+							"dependsOn": [
+								{
+									"activity": "Publish full Handshake",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"url": {
+									"value": "https://strcartierdev.table.core.windows.net/HRDLFilePublishDetails(PartitionKey='@{variables('SourceEntityType')}',RowKey='@{pipeline().parameters.FileType}')",
+									"type": "Expression"
+								},
+								"connectVia": {
+									"referenceName": "AutoResolveIntegrationRuntime",
+									"type": "IntegrationRuntimeReference"
+								},
+								"method": "PATCH",
+								"headers": {
+									"Content-Type": "application/json",
+									"x-ms-version": "2020-04-08",
+									"Accept": "application/json;odata=nometadata"
+								},
+								"body": {
+									"value": "{\n    \"DestinationDataPath\": \"publish/@{variables('PublishDataPath')}\",\n    \"DestinationHandshakePath\": \"publish/@{variables('PublishHandShakePath')}\",\n    \"IsPublished\":true\n}",
+									"type": "Expression"
+								},
+								"authentication": {
+									"type": "MSI",
+									"resource": "https://storage.azure.com/"
+								}
+							}
+						},
+						{
+							"name": "Set EntityType",
+							"description": "Sets the EntityType param with column 'PartitionKey'.",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"policy": {
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "SourceEntityType",
+								"value": {
+									"value": "@item().PartitionKey",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Set PublishDataPath",
+							"description": "Sets the PublishDataPath param from column 'SourceDataPath'. Removes gold from path. ",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "Set SourceDataPath",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "PublishDataPath",
+								"value": {
+									"value": "@split(variables('SourceLatestSourceDataPath'), 'gold/')[1]",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Set PublishHandshake",
+							"description": "Sets the PublishHandshake param from column 'SourceHandshake'. Removes gold from path. ",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "Set SourceHandshake",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "PublishHandShakePath",
+								"value": {
+									"value": "@split(variables('SourceLatestHandshakePath'), 'gold/')[1]",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Add publish information to HRDLCleanUpRecords Table",
+							"description": "Adds an entry to HRDLCleanUpRecords table with the needed information to clean it up later.",
+							"type": "WebActivity",
+							"dependsOn": [
+								{
+									"activity": "Update HRDLFilePublishDetails",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"url": {
+									"value": "https://strcartierdev.table.core.windows.net/HRDLCleanUpRecords",
+									"type": "Expression"
+								},
+								"connectVia": {
+									"referenceName": "AutoResolveIntegrationRuntime",
+									"type": "IntegrationRuntimeReference"
+								},
+								"method": "POST",
+								"headers": {
+									"Content-Type": "application/json",
+									"x-ms-version": "2020-04-08",
+									"Accept": "application/json;odata=nometadata"
+								},
+								"body": {
+									"value": "{  \n   \"RowKey\":\"@{formatDateTime(utcNow(), 'yyyy-MM-ddTHH:mm:ss.fffffffK')}\",\n   \"PartitionKey\": \"@{pipeline().parameters.FileType}\",\n   \"PublishedPath\":\"publish/@{variables('PublishDataPath')}\",\n   \"PublishFolder\": \"@{variables('HRDLFolderPath')}\",\n   \"FolderName\": \"@{item().LatestFolderName}\",\n   \"IsDeleted\":false\n}  ",
+									"type": "Expression"
+								},
+								"authentication": {
+									"type": "MSI",
+									"resource": "https://storage.azure.com/"
+								}
+							}
+						},
+						{
+							"name": "Set HRDLFolderPath",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "Set PublishHandshake",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "HRDLFolderPath",
+								"value": {
+									"value": "@{concat('publish/', split(variables('PublishHandShakePath'), '/Handshake')[0])}",
+									"type": "Expression"
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Execute HRDL_Clean_Up",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Publish each Full Entity",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "Publish_HRDL_Clean_Up",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"ThresholdInHours": -48,
+						"FileType": {
+							"value": "@pipeline().parameters.FileType",
+							"type": "Expression"
+						}
+					}
+				}
+			}
+		],
+		"parameters": {
+			"FileType": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"SourceLatestSourceDataPath": {
+				"type": "String"
+			},
+			"SourceLatestHandshakePath": {
+				"type": "String"
+			},
+			"SourceEntityType": {
+				"type": "String"
+			},
+			"PublishDataPath": {
+				"type": "String"
+			},
+			"PublishHandShakePath": {
+				"type": "String"
+			},
+			"SourceRowKey": {
+				"type": "String"
+			},
+			"HRDLFolderPath": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "WFS/Publish"
+		},
+		"annotations": []
+	}
+}

@@ -1,0 +1,41 @@
+{
+	"name": "Extract metadata from WFS and publish to HR Data Lake",
+	"properties": {
+		"description": "Triggers a pipeline that extracts & processes metadata provided by WFS and publishes it to HR DataLake's publish/TR01 path's metadata subfolders. \n\nThis is scheduled @ 11 PM PT which is 2 hours after the scheduled job on WFS that provides metadata files completes.",
+		"annotations": [],
+		"runtimeState": "Started",
+		"pipelines": [
+			{
+				"pipelineReference": {
+					"referenceName": "Pull_Wfs_Metadata_Parent",
+					"type": "PipelineReference"
+				},
+				"parameters": {
+					"ExpectedFiles": [
+						"BANK_policy_info_export.csv",
+						"PAY_CODE_policy_info_export.csv",
+						"TOR_ABSENCE_TYPE_policy_info_export.csv",
+						"bank_balance_export.csv"
+					]
+				}
+			}
+		],
+		"type": "ScheduleTrigger",
+		"typeProperties": {
+			"recurrence": {
+				"frequency": "Day",
+				"interval": 1,
+				"startTime": "2023-09-13T18:45:00",
+				"timeZone": "Pacific Standard Time",
+				"schedule": {
+					"minutes": [
+						30
+					],
+					"hours": [
+						2
+					]
+				}
+			}
+		}
+	}
+}

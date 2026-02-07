@@ -1,0 +1,129 @@
+{
+	"name": "helper_dependency_injector",
+	"properties": {
+		"folder": {
+			"name": "helpers"
+		},
+		"nbformat": 4,
+		"nbformat_minor": 2,
+		"bigDataPool": {
+			"referenceName": "devpoolv34",
+			"type": "BigDataPoolReference"
+		},
+		"sessionProperties": {
+			"driverMemory": "112g",
+			"driverCores": 16,
+			"executorMemory": "112g",
+			"executorCores": 16,
+			"numExecutors": 2,
+			"conf": {
+				"spark.dynamicAllocation.enabled": "false",
+				"spark.dynamicAllocation.minExecutors": "2",
+				"spark.dynamicAllocation.maxExecutors": "2",
+				"spark.autotune.trackingId": "4dfba8dd-d34d-415f-878f-baa4195a7ce3"
+			}
+		},
+		"metadata": {
+			"saveOutput": true,
+			"enableDebugMode": true,
+			"kernelspec": {
+				"name": "synapse_pyspark",
+				"display_name": "Synapse PySpark"
+			},
+			"language_info": {
+				"name": "python"
+			},
+			"a365ComputeOptions": {
+				"id": "/subscriptions/f8a339ea-4445-4d69-a4bb-b7c77c9db241/resourceGroups/RG-Cartier-Dev/providers/Microsoft.Synapse/workspaces/synw-time-cartier-dev/bigDataPools/devpool",
+				"name": "devpoolv34",
+				"type": "Spark",
+				"endpoint": "https://synw-time-cartier-dev.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/devpool",
+				"auth": {
+					"type": "AAD",
+					"authResource": "https://dev.azuresynapse.net"
+				},
+				"sparkVersion": "3.3",
+				"nodeCount": 10,
+				"cores": 16,
+				"memory": 112,
+				"automaticScaleJobs": false
+			},
+			"sessionKeepAliveTimeout": 30
+		},
+		"cells": [
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"from pyspark.sql import SparkSession\r\n",
+					"from dependency_injector import containers, providers\r\n",
+					"\r\n",
+					"\r\n",
+					"class DependencyContainer(containers.DeclarativeContainer):\r\n",
+					"    \"\"\"\r\n",
+					"    A dependency injection container for providing instances of various clients\r\n",
+					"    and services required for the application.\r\n",
+					"    \"\"\"\r\n",
+					"    spark_session = providers.Singleton(SparkSession.builder.appName('hr-datalake-publish').getOrCreate)\r\n",
+					"\r\n",
+					"    @providers.Singleton\r\n",
+					"    def datalake_client() -> DataLakeClient:\r\n",
+					"        \"\"\"\r\n",
+					"        Provides an instance of the DataLakeClient.\r\n",
+					"\r\n",
+					"        Returns:\r\n",
+					"            An instance of the DataLakeClient.\r\n",
+					"        \"\"\"\r\n",
+					"        return DataLakeClient(linked_service_name, storage_account_name, spark_session)\r\n",
+					"     \r\n",
+					"    @providers.Singleton\r\n",
+					"    def key_vault_client() -> KeyVaultClient:\r\n",
+					"        \"\"\"\r\n",
+					"        Provides an instance of the KeyVaultClient.\r\n",
+					"\r\n",
+					"        Returns:\r\n",
+					"            An instance of the KeyVaultClient.\r\n",
+					"        \"\"\"\r\n",
+					"        return KeyVaultClient('CartierKeyVault')\r\n",
+					"\r\n",
+					"    @providers.Singleton\r\n",
+					"    def table_service_client(linked_service_name: str, storage_account_name: str) -> AzureTableClient:\r\n",
+					"        \"\"\"\r\n",
+					"        Provides an instance of the AzureTableClient.\r\n",
+					"\r\n",
+					"        Returns:\r\n",
+					"            An instance of the AzureTableClient.\r\n",
+					"        \"\"\"\r\n",
+					"\r\n",
+					"        account_url_table = f\"https://{storage_account_name}.table.core.windows.net/\"\r\n",
+					"        credential = ManagedIdentityCredential(linked_service_name)\r\n",
+					"        table_service_client = AzureTableServiceClient(account_url_table, credential)\r\n",
+					"\r\n",
+					"        return AzureTableClient(table_service_client, spark_session)\r\n",
+					"\r\n",
+					"    @providers.Singleton\r\n",
+					"    def telemetry_client(run_id: str, data_type: str, run_timestamp: str) -> TelemetryClient:\r\n",
+					"        \"\"\"\r\n",
+					"        Provides an instance of the TelemetryClient.\r\n",
+					"\r\n",
+					"        Returns:\r\n",
+					"            An instance of the TelemetryClient.\r\n",
+					"        \"\"\"\r\n",
+					"        return TelemetryClient(instrumentation_key, run_id, data_type, run_timestamp)\r\n",
+					""
+				],
+				"execution_count": 12
+			}
+		]
+	}
+}

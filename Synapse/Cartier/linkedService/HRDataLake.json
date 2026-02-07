@@ -1,0 +1,18 @@
+{
+	"name": "HRDataLake",
+	"properties": {
+		"annotations": [],
+		"type": "AzureBlobFS",
+		"typeProperties": {
+			"url": "https://strhrdldevproxy.dfs.core.windows.net",
+			"credential": {
+				"referenceName": "HRDLCredentialsUserAssignedMI",
+				"type": "CredentialReference"
+			}
+		},
+		"connectVia": {
+			"referenceName": "AutoResolveIntegrationRuntime",
+			"type": "IntegrationRuntimeReference"
+		}
+	}
+}

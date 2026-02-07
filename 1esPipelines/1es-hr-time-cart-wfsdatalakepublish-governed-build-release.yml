@@ -1,0 +1,479 @@
+# This yaml pipeline was generated from existing yaml build "https://microsoftit.visualstudio.com/OneITVSO/_build?definitionId=43412" & classic release "https://microsoftit.visualstudio.com/OneITVSO/_release?_a=releases&view=mine&definitionId=22086"
+# Per latest 1ES guidelines pipelines were merged into one governed pipeline template: "https://eng.ms/docs/cloud-ai-platform/devdiv/one-engineering-system-1es/1es-docs/1es-pipeline-templates/migration-release/overview"
+# This Yaml Document has been converted by ESAI Yaml Pipeline Conversion Tool; this pipeline will be extended to the OneESPT template
+
+#################################################################  Global pipeline settings ##############################################################################
+name: $(Date:yyyyMMdd).$(Rev:r)
+variables:
+- name: ApprovalMsiIntegration
+  value: true
+- name: azureRegion
+  value: westus
+- name: CartierTableStorage_connectionString
+  value: DefaultEndpointsProtocol=https;AccountName=@{linkedService().storageAccountName};
+- name: WfsSftp_properties_typeProperties_host
+  value: interface.us.wfs.cloud
+resources:
+  repositories:
+  - repository: 1ESPipelineTemplates
+    type: git
+    name: 1ESPipelineTemplates/1ESPipelineTemplates
+    ref: refs/tags/release
+  - repository: self
+    type: git
+    ref: refs/heads/main
+trigger:
+  branches:
+    include:
+    - main
+    - develop
+    - features/cartier-synapse-collab
+  paths:
+    include:
+    - Synapse/Cartier/*
+schedules:
+- cron: '0 12 * * 0'
+  displayName: Weekly Sunday build
+  branches:
+    include:
+    - main
+  always: true    
+extends:
+  template: v1/1ES.Official.PipelineTemplate.yml@1ESPipelineTemplates
+  parameters:
+    pool:
+      name: Azure-Pipelines-1ESPT-ExDShared
+      image: windows-2022
+      os: windows
+    customBuildTags:
+    - 1ES-PT-WFS-Build-Release-Pipeline
+
+#################################################################  Synapse Build  ##############################################################################
+    stages:
+    - stage: Build_Stage_Synapse
+      jobs:
+      - job: job
+        steps:
+        - task: CredScan@3
+          inputs:
+            debugMode: false
+          condition: succeededOrFailed()
+          displayName: 'Build: Run Credential Scanner'
+
+        - task: UsePythonVersion@0
+          inputs:
+            versionSpec: '3.10'
+            addToPath: true
+
+        - task: PipAuthenticate@1
+          inputs:
+            artifactFeeds: 'OneITVSO/HR-TIME-TimeLeaveShiftSchedCartier'
+
+        - pwsh: |
+            $ErrorActionPreference = "Stop"
+            python -m pip install --upgrade pip
+            Get-Content requirements.txt | ForEach-Object {
+              pip install $_
+              if ($LASTEXITCODE -ne 0) {
+                exit $LASTEXITCODE
+              }
+            }
+          workingDirectory: '$(System.DefaultWorkingDirectory)\InfraDeployment'
+          displayName: 'Build: Install dependencies'
+
+        - task: PowerShell@2
+          displayName: 'Build: Convert Notebook to Python'
+          inputs:
+            targetType: 'filePath'
+            filePath: '$(System.DefaultWorkingDirectory)\InfraDeployment\scripts\ConvertNotebookJsonToPython.ps1'
+            arguments: '-SourceFile "$(System.DefaultWorkingDirectory)\Synapse\Cartier\notebook\unit_test_runner.json" -DestinationFile "$(System.DefaultWorkingDirectory)\Synapse\Cartier\test_unit_test_runner.py"'
+
+        - script: |
+            pytest $(System.DefaultWorkingDirectory)/Synapse/Cartier/test_unit_test_runner.py --cov=$(System.DefaultWorkingDirectory)/Synapse/Cartier --cov-report=xml:coverage.xml --junitxml=test-results.xml
+          displayName: 'Build: Run tests with coverage'
+          continueOnError: true
+
+        - task: PublishTestResults@2
+          inputs:
+            testResultsFormat: 'JUnit'
+            testResultsFiles: 'test-results.xml'
+          displayName: 'Build: Publish test results'
+          condition: succeededOrFailed()
+
+        - task: PublishCodeCoverageResults@2
+          inputs:
+            codeCoverageTool: 'Cobertura'
+            summaryFileLocation: '$(System.DefaultWorkingDirectory)/**/coverage.xml'
+          displayName: 'Build: Publish code coverage results'
+          condition: succeededOrFailed()
+
+        - task: PowerShell@2
+          displayName: 'Build: Verify Code Coverage'
+          inputs:
+            targetType: 'inline'
+            script: |
+              [xml]$coverageData = Get-Content $(System.DefaultWorkingDirectory)\coverage.xml
+                    $lineRate = [double]$coverageData.coverage.'line-rate'
+                    $threshold = 0.70
+                    if ($lineRate -lt $threshold) {
+                        Write-Error "Code coverage ($([math]::Round($lineRate*100,2))%) is below the threshold ($([math]::Round($threshold*100,2))%)"
+                        exit 1
+                    } else {
+                        Write-Output "Code coverage ($([math]::Round($lineRate*100,2))%) is above the threshold"
+                    }
+          condition: succeededOrFailed()
+          continueOnError: true
+
+        - task: Synapse workspace deployment@2
+          displayName: 'Build: Validate Synapse'         
+          inputs:
+            operation: 'validate'
+            ArtifactsFolder: '$(System.DefaultWorkingDirectory)/Synapse/Cartier'
+            azureSubscription: 'MSFT - Workforce Software Integrations -ServiceConnection'
+            ResourceGroupName: 'RG-Cartier-Dev'
+            TargetWorkspaceName: 'synw-time-cartier-dev'
+            DeleteArtifactsNotInTemplate: false
+            DeployManagedPrivateEndpoints: false
+            FailOnMissingOverrides: false
+            Environment: 'prod'
+            npmpackage: 'prod'
+
+        - task: CopyFiles@2
+          displayName: 'Build: Copy Requirements'
+          inputs:
+            SourceFolder: '$(System.DefaultWorkingDirectory)/InfraDeployment/'
+            Contents: '*requirements.txt'
+            TargetFolder: '$(Build.ArtifactStagingDirectory)/drop'
+          
+        - task: CopyFiles@2
+          displayName: 'Build: Copy Template Files'
+          inputs:
+            SourceFolder: '$(System.DefaultWorkingDirectory)/ExportedArtifacts/'
+            Contents: '*'
+            TargetFolder: '$(Build.ArtifactStagingDirectory)/drop'
+
+        - task: 1ES.PublishPipelineArtifact@1
+          displayName: 'Build: Publish Pipeline Artifacts'
+          inputs:
+            targetPath : $(Build.ArtifactStagingDirectory)/drop
+            artifactName: 'drop'
+
+#################################################################  Synapse Dev Release  ##############################################################################
+
+    - stage: Trigger_Dev
+      trigger: manual
+      jobs: 
+      - job: ManualTrigger
+        pool: server
+ 
+    - stage: Synapse_Dev_Release_Stage
+      displayName: 'Dev_Synapse_Release'
+      dependsOn: Trigger_Dev
+      condition: succeeded()
+      variables:
+      - name: CartierBlobStorage_properties_typeProperties_serviceEndpoint
+        value: https://strcartierdev.blob.core.windows.net
+      - name: CartierKeyVault_properties_typeProperties_baseUrl
+        value: https://time-cartier-devkv.vault.azure.net/
+      - name: CartierLinkedServiceName
+        value: synw-time-cartier-dev-WorkspaceDefaultStorage
+      - name: CartierStorageAccountName
+        value: strcartierdev
+      - name: CartierTableStorage_properties_typeProperties_serviceEndpoint
+        value: https://strcartierdev.table.core.windows.net/
+      - name: environment
+        value: dev
+      - name: HRDataLake_properties_typeProperties_url
+        value: https://strhrdldevproxy.dfs.core.windows.net
+      - name: ICMConnector_properties_typeProperties_functionAppUrl
+        value: https://cartier-dev-icm-functions.azurewebsites.net
+      - name: InstrumentationKeyAppInsight
+        value: 2f09ad23-94b6-4e46-9a4b-b8ced5d92ccc
+      - name: notebookPool
+        value: devpoolv34
+      - name: synw-time-cartier-dev-WorkspaceDefaultSqlServer_connectionString
+        value: Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=tcp:synw-time-cartier-dev.sql.azuresynapse.net,1433;Initial Catalog=@{linkedService().DBName}
+      - name: synw-time-cartier-dev-WorkspaceDefaultStorage_properties_typeProperties_url
+        value: https://strcartierdev.dfs.core.windows.net
+      - name: WfsSftp_properties_typeProperties_userName
+        value: msftdatalakedevftp
+      - name: WfsSftpFilePath
+        value: /dev/outgoing
+      - name: WfsSftpPrudential_properties_typeProperties_userName
+        value: msftprudentialdevftp
+      jobs:
+      - job: Synapse_Dev_Release
+        displayName: Synapse_Dev_Release
+        condition: succeeded()
+        timeoutInMinutes: 0
+        pool:
+          name: WFSintegrations-ADO-Pool
+          image: 1esimg_wfsint_synapsedeployment
+        templateContext:
+          type: releaseJob
+          isProduction: false
+          inputs:
+          - input: pipelineArtifact
+            artifactName: drop
+            targetPath: $(Pipeline.Workspace)/drop
+        steps:       
+        - task: toggle-triggers-dev@2
+          displayName: 'Toggle Trigger Off'
+          inputs:
+            azureSubscription: '1ES-WFSSynapse-SvcConnection'
+            ResourceGroupName: 'RG-Cartier-Dev'
+            WorkspaceName: 'synw-time-cartier-dev'
+            ToggleOn: false
+            Triggers: '*'
+        - task: AzureSynapseWorkspace.synapsecicd-deploy.synapse-deploy.Synapse workspace deployment@2
+          displayName: 'Synpase deployment task for workspace: synw-time-cartier-dev'
+          inputs:
+            TemplateFile: '$(Pipeline.Workspace)/drop/TemplateForWorkspace.json'
+            ParametersFile: '$(Pipeline.Workspace)/drop/TemplateParametersForWorkspace.json'
+            azureSubscription: '1ES-WFSSynapse-SvcConnection'
+            ResourceGroupName: 'RG-Cartier-Dev'
+            TargetWorkspaceName: 'synw-time-cartier-dev'
+            OverrideArmParameters: '-CartierBlobStorage_properties_typeProperties_serviceEndpoint $(CartierBlobStorage_properties_typeProperties_serviceEndpoint) -CartierKeyVault_properties_typeProperties_baseUrl $(CartierKeyVault_properties_typeProperties_baseUrl) -HRDataLake_properties_typeProperties_url $(HRDataLake_properties_typeProperties_url) -synw-time-cartier-dev-WorkspaceDefaultSqlServer_connectionString $(synw-time-cartier-dev-WorkspaceDefaultSqlServer_connectionString) -synw-time-cartier-dev-WorkspaceDefaultStorage_properties_typeProperties_url $(synw-time-cartier-dev-WorkspaceDefaultStorage_properties_typeProperties_url) -WfsSftp_properties_typeProperties_host $(WfsSftp_properties_typeProperties_host) -WfsSftp_properties_typeProperties_userName $(WfsSftp_properties_typeProperties_userName) -ICMConnector_properties_typeProperties_functionAppUrl $(ICMConnector_properties_typeProperties_functionAppUrl) -api_data_location_entity_notebooksPoolName $(notebookPool) -api_metadata_entity_notebooksPoolName $(notebookPool) -api_metadata_entity_unit_tests_notebooksPoolName $(notebookPool) -data_configs_notebooksPoolName $(notebookPool) -data_config_unit_tests_notebooksPoolName $(notebookPool) -flattened_nested_json_notebooksPoolName $(notebookPool) -flattened_nested_json_unit_tests_notebooksPoolName $(notebookPool) -generate_auth_token_notebooksPoolName $(notebookPool) -helper_data_configs_notebooksPoolName $(notebookPool) -helper_data_lake_client_notebooksPoolName $(notebookPool) -helper_dependency_injector_notebooksPoolName $(notebookPool) -helper_key_vault_client_notebooksPoolName $(notebookPool) -helper_mssparkutils_notebooksPoolName $(notebookPool) -helper_schema_transform_notebooksPoolName $(notebookPool) -helper_schema_transform_unit_tests_notebooksPoolName $(notebookPool) -helper_table_storage_client_notebooksPoolName $(notebookPool) -helper_table_storage_client_unit_tests_notebooksPoolName $(notebookPool) -helper_telemetry_client_notebooksPoolName $(notebookPool) -hrdl_delta_file_queue_entity_notebooksPoolName $(notebookPool) -hrdl_publish_job_entity_notebooksPoolName $(notebookPool) -ingestion_logic_api_data_retriever_notebooksPoolName $(notebookPool) -ingest_runners_data_to_storage_notebooksPoolName $(notebookPool) -process_api_response_notebooksPoolName $(notebookPool) -publishing_logic_notebooksPoolName $(notebookPool) -publishing_logic_unit_tests_notebooksPoolName $(notebookPool) -publishing_runner_notebooksPoolName $(notebookPool) -runners_base_setup_notebooksPoolName $(notebookPool) -table_storage_actions_notebooksPoolName $(notebookPool) -transformation_helper_notebooksPoolName $(notebookPool) -transformation_helper_unit_tests_notebooksPoolName $(notebookPool) -transformation_logic_notebooksPoolName $(notebookPool) -transformation_logic_unit_tests_notebooksPoolName $(notebookPool) -transformation_runner_notebooksPoolName $(notebookPool) -unit_test_runner_notebooksPoolName $(notebookPool) -validation_engine_notebooksPoolName $(notebookPool) -validation_engine_unit_tests_notebooksPoolName $(notebookPool) -WfsSftpPrudential_properties_typeProperties_userName $(WfsSftpPrudential_properties_typeProperties_userName) -CartierTableStorage_properties_typeProperties_serviceEndpoint $(CartierTableStorage_properties_typeProperties_serviceEndpoint)'
+        - task: toggle-triggers-dev@2
+          displayName: 'Toggle Trigger ON'
+          inputs:
+            azureSubscription: '1ES-WFSSynapse-SvcConnection'
+            ResourceGroupName: 'RG-Cartier-Dev'
+            WorkspaceName: 'synw-time-cartier-dev'
+            ToggleOn: true
+            Triggers: '*'
+        - task: AzurePowerShell@5
+          displayName: Update Pool cartierpool dependencies
+          inputs:
+            azureSubscription: '1ES-WFSSynapse-SvcConnection'
+            ScriptType: 'InlineScript'
+            Inline: |
+              $pool = Get-AzSynapseSparkPool -WorkspaceName synw-time-cartier-dev -Name cartierpoolv34
+              $pool | Update-AzSynapseSparkPool -LibraryRequirementsFilePath $(Pipeline.Workspace)/drop/requirements.txt
+            azurePowerShellVersion: 'LatestVersion'
+
+#################################################################  Synapse Ppe Release  ##############################################################################
+
+    - stage: Trigger_PPE
+      trigger: manual
+      jobs: 
+      - job: ApprovalTask
+        pool: server
+        steps:
+        - task: ManualValidation@1
+          displayName: ApprovalTask # Required approval to proceed for deployment
+          inputs:
+            notifyUsers: 'payrolldri@microsoft.com'
+            approvers: 'payrolldri@microsoft.com'
+            
+    - stage: Synapse_Ppe_Release
+      displayName: 'Ppe_Synapse_Release'
+      dependsOn: Trigger_PPE
+      condition: succeeded()
+      variables:
+      - name: BCPEndpoint
+        value: prod-20.westus3.logic.azure.com:443/workflows/0ed080e2a0124ee18cf59f0e4c3c405e
+      - name: CartierBlobStorage_properties_typeProperties_serviceEndpoint
+        value: https://strcartierppe.blob.core.windows.net
+      - name: CartierKeyVault_properties_typeProperties_baseUrl
+        value: https://time-cartier-ppekv.vault.azure.net/
+      - name: CartierLinkedServiceName
+        value: synw-time-cartier-ppe-WorkspaceDefaultStorage
+      - name: CartierStorageAccountName
+        value: strcartierppe
+      - name: CartierTableStorage_properties_typeProperties_serviceEndpoint
+        value: https://strcartierppe.table.core.windows.net/
+      - name: environment
+        value: ppe
+      - name: HRDataLake_properties_typeProperties_url
+        value: https://hcmlakeuat.dfs.core.windows.net
+      - name: HrdlUserAssignedMI
+        value: /subscriptions/f8a339ea-4445-4d69-a4bb-b7c77c9db241/resourcegroups/RG-Cartier-PPE/providers/Microsoft.ManagedIdentity/userAssignedIdentities/synw-time-cartier-ppe-mi
+      - name: ICMConnector_properties_typeProperties_functionAppUrl
+        value: https://cartier-ppe-icm-functions.azurewebsites.net
+      - name: IcmEnvironment
+        value: ICM Environment:PPE
+      - name: InstrumentationKeyAppInsight
+        value: ad37f190-1fe8-40f5-becb-3efb9f49ef9f
+      - name: notebookPool
+        value: cartierpoolv34
+      - name: synw-time-cartier-dev-WorkspaceDefaultSqlServer_connectionString
+        value: Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=tcp:synw-time-cartier-ppe.sql.azuresynapse.net,1433;Initial Catalog=@{linkedService().DBName}
+      - name: synw-time-cartier-dev-WorkspaceDefaultStorage_properties_typeProperties_url
+        value: https://strcartierppe.dfs.core.windows.net
+      - name: WfsSftp_properties_typeProperties_userName
+        value: msftdatalaketestftp
+      - name: WfsSftpFilePath
+        value: /test/outgoing
+      - name: WfsSftpPrudential_properties_typeProperties_userName
+        value: msftprudentialtestftp
+
+      jobs:
+      - job: Synapse_PPE_Release
+        displayName: Synapse_PPE_Release
+        condition: succeeded()
+        timeoutInMinutes: 0
+        pool:
+          name: WFSintegrations-ADO-Pool
+          image: 1esimg_wfsint_synapsedeployment
+        templateContext:
+          type: releaseJob
+          isProduction: false
+          inputs:
+          - input: pipelineArtifact
+            artifactName: drop
+            targetPath: $(Pipeline.Workspace)/drop
+        steps:
+        - task: toggle-triggers-dev@2
+          displayName: 'Toggle Trigger Off'
+          inputs:
+            azureSubscription: '1ES-WFSSynapse-SvcConnection'
+            ResourceGroupName: 'RG-Cartier-PPE'
+            WorkspaceName: 'synw-time-cartier-ppe'
+            ToggleOn: false
+            Triggers: '*'
+        - task: PowerShell@2
+          displayName: PowerShell Script
+          inputs:
+            targetType: inline
+            script: "$utf8NoBomEncoding = New-Object System.Text.UTF8Encoding($False)\n   \n$fileContent = Get-Content -Path \"$(Pipeline.Workspace)/drop/TemplateForWorkspace.json\" -Raw\n$fileContent = $fileContent -replace \"strcartierdev\", \"$(CartierStorageAccountName)\"\n$fileContent = $fileContent -replace \"ICM Environment:DEV\", \"$(IcmEnvironment)\"\n$fileContent = $fileContent -replace \"/dev/outgoing\", \"$(WfsSftpFilePath)\"\n$fileContent = $fileContent -replace \"synw-time-cartier-dev-WorkspaceDefaultStorage\", \"$(CartierLinkedServiceName)\"\n$fileContent = $fileContent -replace \"devpoolv34\", \"$(notebookPool)\"\n$fileContent = $fileContent -replace \"2f09ad23-94b6-4e46-9a4b-b8ced5d92ccc\", \"$(InstrumentationKeyAppInsight)\"\n$fileContent = $fileContent -replace \"/subscriptions/f8a339ea-4445-4d69-a4bb-b7c77c9db241/resourcegroups/RG-Cartier-Dev/providers/Microsoft.ManagedIdentity/userAssignedIdentities/synw-time-cartier-dev-mi\", \"$(HrdlUserAssignedMI)\"\n$fileContent = $fileContent -replace \"prod-19.westus2.logic.azure.com:443/workflows/478e9818ef0343119a72007c3fbda603\", \"$(BCPEndpoint)\"\n   \n$filePath = \"$(Pipeline.Workspace)/drop/TemplateForWorkspace.json\"\n$stream = [System.IO.StreamWriter]::new($filePath, $False, $utf8NoBomEncoding)\n$stream. Write($fileContent)\n$stream. Close()\n\n$paramsFileContent = Get-Content -Path \"$(Pipeline.Workspace)/drop/TemplateParametersForWorkspace.json\" -Raw\n   \n$paramsFilePath = \"$(Pipeline.Workspace)/drop/TemplateParametersForWorkspace.json\"\n$paramsStream = [System.IO.StreamWriter]::new($paramsFilePath, $False, $utf8NoBomEncoding)\n$paramsStream.Write($paramsFileContent)\n$paramsStream.Close()"
+        - task: AzureSynapseWorkspace.synapsecicd-deploy.synapse-deploy.Synapse workspace deployment@2
+          displayName: 'Synpase deployment task for workspace: synw-time-cartier-ppe'
+          inputs:
+            TemplateFile: $(Pipeline.Workspace)/drop/TemplateForWorkspace.json
+            ParametersFile: $(Pipeline.Workspace)/drop/TemplateParametersForWorkspace.json
+            AzureResourceManagerConnection: 1ES-WFSSynapse-SvcConnection
+            ResourceGroupName: RG-Cartier-PPE
+            TargetWorkspaceName: synw-time-cartier-ppe
+            OverrideArmParameters: -CartierBlobStorage_properties_typeProperties_serviceEndpoint $(CartierBlobStorage_properties_typeProperties_serviceEndpoint) -CartierKeyVault_properties_typeProperties_baseUrl $(CartierKeyVault_properties_typeProperties_baseUrl) -HRDataLake_properties_typeProperties_url $(HRDataLake_properties_typeProperties_url) -synw-time-cartier-dev-WorkspaceDefaultSqlServer_connectionString $(synw-time-cartier-dev-WorkspaceDefaultSqlServer_connectionString) -synw-time-cartier-dev-WorkspaceDefaultStorage_properties_typeProperties_url $(synw-time-cartier-dev-WorkspaceDefaultStorage_properties_typeProperties_url) -WfsSftp_properties_typeProperties_host $(WfsSftp_properties_typeProperties_host) -WfsSftp_properties_typeProperties_userName $(WfsSftp_properties_typeProperties_userName) -ICMConnector_properties_typeProperties_functionAppUrl $(ICMConnector_properties_typeProperties_functionAppUrl) -api_data_location_entity_notebooksPoolName $(notebookPool) -api_metadata_entity_notebooksPoolName $(notebookPool) -api_metadata_entity_unit_tests_notebooksPoolName $(notebookPool) -data_configs_notebooksPoolName $(notebookPool) -data_config_unit_tests_notebooksPoolName $(notebookPool) -flattened_nested_json_notebooksPoolName $(notebookPool) -flattened_nested_json_unit_tests_notebooksPoolName $(notebookPool) -generate_auth_token_notebooksPoolName $(notebookPool) -helper_data_configs_notebooksPoolName $(notebookPool) -helper_data_lake_client_notebooksPoolName $(notebookPool) -helper_dependency_injector_notebooksPoolName $(notebookPool) -helper_key_vault_client_notebooksPoolName $(notebookPool) -helper_mssparkutils_notebooksPoolName $(notebookPool) -helper_schema_transform_notebooksPoolName $(notebookPool) -helper_schema_transform_unit_tests_notebooksPoolName $(notebookPool) -helper_table_storage_client_notebooksPoolName $(notebookPool) -helper_table_storage_client_unit_tests_notebooksPoolName $(notebookPool) -helper_telemetry_client_notebooksPoolName $(notebookPool) -hrdl_delta_file_queue_entity_notebooksPoolName $(notebookPool) -hrdl_publish_job_entity_notebooksPoolName $(notebookPool) -ingestion_logic_api_data_retriever_notebooksPoolName $(notebookPool) -ingest_runners_data_to_storage_notebooksPoolName $(notebookPool) -process_api_response_notebooksPoolName $(notebookPool) -publishing_logic_notebooksPoolName $(notebookPool) -publishing_logic_unit_tests_notebooksPoolName $(notebookPool) -publishing_runner_notebooksPoolName $(notebookPool) -runners_base_setup_notebooksPoolName $(notebookPool) -table_storage_actions_notebooksPoolName $(notebookPool) -transformation_helper_notebooksPoolName $(notebookPool) -transformation_helper_unit_tests_notebooksPoolName $(notebookPool) -transformation_logic_notebooksPoolName $(notebookPool) -transformation_logic_unit_tests_notebooksPoolName $(notebookPool) -transformation_runner_notebooksPoolName $(notebookPool) -unit_test_runner_notebooksPoolName $(notebookPool) -validation_engine_notebooksPoolName $(notebookPool) -validation_engine_unit_tests_notebooksPoolName $(notebookPool) -WfsSftpPrudential_properties_typeProperties_userName $(WfsSftpPrudential_properties_typeProperties_userName) -CartierTableStorage_properties_typeProperties_serviceEndpoint $(CartierTableStorage_properties_typeProperties_serviceEndpoint)
+            FailOnMissingOverrides: true
+        - task: toggle-triggers-dev@2
+          displayName: 'Toggle Trigger ON'
+          inputs:
+            azureSubscription: '1ES-WFSSynapse-SvcConnection'
+            ResourceGroupName: 'RG-Cartier-PPE'
+            WorkspaceName: 'synw-time-cartier-ppe'
+            ToggleOn: true
+            Triggers: '*'
+        - task: AzurePowerShell@5
+          displayName: Update Pool cartierpool dependencies
+          inputs:
+            azureSubscription: '1ES-WFSSynapse-SvcConnection'
+            ScriptType: 'InlineScript'
+            Inline: |
+              $pool = Get-AzSynapseSparkPool -WorkspaceName synw-time-cartier-ppe -Name cartierpoolv34
+              $pool | Update-AzSynapseSparkPool -LibraryRequirementsFilePath $(Pipeline.Workspace)/drop/requirements.txt
+            azurePowerShellVersion: 'LatestVersion'
+
+#################################################################  Synapse Prod Release  ##############################################################################
+
+    - stage: Trigger_PROD
+      trigger: manual
+      jobs: 
+      - job: ApprovalTask
+        pool: server
+        steps:
+        - task: ManualValidation@1
+          displayName: ApprovalTask # Required approval to proceed for deployment
+          inputs:
+            notifyUsers: 'payrolldri@microsoft.com'
+            approvers: 'payrolldri@microsoft.com'
+
+    - stage: Synapse_Prod_Release
+      displayName: 'Prod_Synapse_Release'
+      dependsOn: Trigger_PROD
+      condition: succeeded()
+      variables:
+      - name: BCPEndpoint
+        value: prod-04.westus3.logic.azure.com:443/workflows/dc60744d7cf3405c87501ba5d76358a9
+      - name: CartierBlobStorage_properties_typeProperties_serviceEndpoint
+        value: https://strcartierprod.blob.core.windows.net
+      - name: CartierKeyVault_properties_typeProperties_baseUrl
+        value: https://time-cartier-prodkv.vault.azure.net/
+      - name: CartierLinkedServiceName
+        value: synw-time-cartier-prod-WorkspaceDefaultStorage
+      - name: CartierStorageAccountName
+        value: strcartierprod
+      - name: CartierTableStorage_properties_typeProperties_serviceEndpoint
+        value: https://strcartierprod.table.core.windows.net/
+      - name: environment
+        value: prod
+      - name: HRDataLake_properties_typeProperties_url
+        value: https://hcmlakeprod.dfs.core.windows.net
+      - name: HrdlUserAssignedMI
+        value: /subscriptions/f8a339ea-4445-4d69-a4bb-b7c77c9db241/resourcegroups/RG-Cartier-Prod/providers/Microsoft.ManagedIdentity/userAssignedIdentities/synw-time-cartier-prod-mi
+      - name: ICMConnector_properties_typeProperties_functionAppUrl
+        value: https://cartier-prod-icm-functions.azurewebsites.net
+      - name: IcmEnvironment
+        value: ICM Environment:PROD
+      - name: InstrumentationKeyAppInsight
+        value: d832f75e-b2cd-43a6-aee1-320f312287f3
+      - name: notebookPool
+        value: cartierpoolv34
+      - name: synw-time-cartier-dev-WorkspaceDefaultSqlServer_connectionString
+        value: Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=tcp:synw-time-cartier-prod.sql.azuresynapse.net,1433;Initial Catalog=@{linkedService().DBName}
+      - name: synw-time-cartier-dev-WorkspaceDefaultStorage_properties_typeProperties_url
+        value: https://strcartierprod.dfs.core.windows.net
+      - name: WfsSftp_properties_typeProperties_userName
+        value: msftdatalakeprodftp
+      - name: WfsSftpFilePath
+        value: /prod/outgoing
+      - name: WfsSftpPrudential_properties_typeProperties_userName
+        value: msftprudentialprodftp
+      jobs:
+      - job: Synapse_PROD_Release
+        displayName: Synapse_PROD_Release
+        condition: succeeded()
+        timeoutInMinutes: 0
+        pool:
+          name: WFSintegrations-ADO-Pool
+          image: 1esimg_wfsint_synapsedeployment
+        templateContext:
+          type: releaseJob
+          isProduction: true
+          inputs:
+          - input: pipelineArtifact
+            artifactName: drop
+            targetPath: $(Pipeline.Workspace)/drop
+        steps:   
+        - task: toggle-triggers-dev@2
+          displayName: Toggle Trigger OFF
+          inputs:
+            azureSubscription: '1ES-WFSSynapse-SvcConnection'
+            ResourceGroupName: 'RG-Cartier-Prod'
+            WorkspaceName: 'synw-time-cartier-prod'
+            ToggleOn: false
+            Triggers: '*'
+        - task: PowerShell@2
+          displayName: PowerShell Script
+          inputs:
+            targetType: inline
+            script: "$utf8NoBomEncoding = New-Object System.Text.UTF8Encoding($False)\n   \n$fileContent = Get-Content -Path \"$(Pipeline.Workspace)/drop/TemplateForWorkspace.json\" -Raw\n$fileContent = $fileContent -replace \"strcartierdev\", \"$(CartierStorageAccountName)\"\n$fileContent = $fileContent -replace \"ICM Environment:DEV\", \"$(IcmEnvironment)\"\n$fileContent = $fileContent -replace \"/dev/outgoing\", \"$(WfsSftpFilePath)\"\n$fileContent = $fileContent -replace \"synw-time-cartier-dev-WorkspaceDefaultStorage\", \"$(CartierLinkedServiceName)\"\n$fileContent = $fileContent -replace \"devpoolv34\", \"$(notebookPool)\"\n$fileContent = $fileContent -replace \"2f09ad23-94b6-4e46-9a4b-b8ced5d92ccc\", \"$(InstrumentationKeyAppInsight)\"\n$fileContent = $fileContent -replace \"/subscriptions/f8a339ea-4445-4d69-a4bb-b7c77c9db241/resourcegroups/RG-Cartier-Dev/providers/Microsoft.ManagedIdentity/userAssignedIdentities/synw-time-cartier-dev-mi\", \"$(HrdlUserAssignedMI)\"\n$fileContent = $fileContent -replace \"prod-19.westus2.logic.azure.com:443/workflows/478e9818ef0343119a72007c3fbda603\", \"$(BCPEndpoint)\"\n  \n$filePath = \"$(Pipeline.Workspace)/drop/TemplateForWorkspace.json\"\n$stream = [System.IO.StreamWriter]::new($filePath, $False, $utf8NoBomEncoding)\n$stream. Write($fileContent)\n$stream. Close()\n\n$paramsFileContent = Get-Content -Path \"$(Pipeline.Workspace)/drop/TemplateParametersForWorkspace.json\" -Raw\n   \n$paramsFilePath = \"$(Pipeline.Workspace)/drop/TemplateParametersForWorkspace.json\"\n$paramsStream = [System.IO.StreamWriter]::new($paramsFilePath, $False, $utf8NoBomEncoding)\n$paramsStream.Write($paramsFileContent)\n$paramsStream.Close()"
+        - task: AzureSynapseWorkspace.synapsecicd-deploy.synapse-deploy.Synapse workspace deployment@2
+          displayName: 'Synpase deployment task for workspace: synw-time-cartier-prod'
+          inputs:
+            TemplateFile: $(Pipeline.Workspace)/drop/TemplateForWorkspace.json
+            ParametersFile: $(Pipeline.Workspace)/drop/TemplateParametersForWorkspace.json
+            AzureResourceManagerConnection: 1ES-WFSSynapse-SvcConnection
+            ResourceGroupName: RG-Cartier-Prod
+            TargetWorkspaceName: synw-time-cartier-prod
+            DeleteArtifactsNotInTemplate: true
+            OverrideArmParameters: -CartierBlobStorage_properties_typeProperties_serviceEndpoint $(CartierBlobStorage_properties_typeProperties_serviceEndpoint) -CartierKeyVault_properties_typeProperties_baseUrl $(CartierKeyVault_properties_typeProperties_baseUrl) -HRDataLake_properties_typeProperties_url $(HRDataLake_properties_typeProperties_url) -synw-time-cartier-dev-WorkspaceDefaultSqlServer_connectionString $(synw-time-cartier-dev-WorkspaceDefaultSqlServer_connectionString) -synw-time-cartier-dev-WorkspaceDefaultStorage_properties_typeProperties_url $(synw-time-cartier-dev-WorkspaceDefaultStorage_properties_typeProperties_url) -WfsSftp_properties_typeProperties_host $(WfsSftp_properties_typeProperties_host) -WfsSftp_properties_typeProperties_userName $(WfsSftp_properties_typeProperties_userName) -ICMConnector_properties_typeProperties_functionAppUrl $(ICMConnector_properties_typeProperties_functionAppUrl) -api_data_location_entity_notebooksPoolName $(notebookPool) -api_metadata_entity_notebooksPoolName $(notebookPool) -api_metadata_entity_unit_tests_notebooksPoolName $(notebookPool) -data_configs_notebooksPoolName $(notebookPool) -data_config_unit_tests_notebooksPoolName $(notebookPool) -flattened_nested_json_notebooksPoolName $(notebookPool) -flattened_nested_json_unit_tests_notebooksPoolName $(notebookPool) -generate_auth_token_notebooksPoolName $(notebookPool) -helper_data_configs_notebooksPoolName $(notebookPool) -helper_data_lake_client_notebooksPoolName $(notebookPool) -helper_dependency_injector_notebooksPoolName $(notebookPool) -helper_key_vault_client_notebooksPoolName $(notebookPool) -helper_mssparkutils_notebooksPoolName $(notebookPool) -helper_schema_transform_notebooksPoolName $(notebookPool) -helper_schema_transform_unit_tests_notebooksPoolName $(notebookPool) -helper_table_storage_client_notebooksPoolName $(notebookPool) -helper_table_storage_client_unit_tests_notebooksPoolName $(notebookPool) -helper_telemetry_client_notebooksPoolName $(notebookPool) -hrdl_delta_file_queue_entity_notebooksPoolName $(notebookPool) -hrdl_publish_job_entity_notebooksPoolName $(notebookPool) -ingestion_logic_api_data_retriever_notebooksPoolName $(notebookPool) -ingest_runners_data_to_storage_notebooksPoolName $(notebookPool) -process_api_response_notebooksPoolName $(notebookPool) -publishing_logic_notebooksPoolName $(notebookPool) -publishing_logic_unit_tests_notebooksPoolName $(notebookPool) -publishing_runner_notebooksPoolName $(notebookPool) -runners_base_setup_notebooksPoolName $(notebookPool) -table_storage_actions_notebooksPoolName $(notebookPool) -transformation_helper_notebooksPoolName $(notebookPool) -transformation_helper_unit_tests_notebooksPoolName $(notebookPool) -transformation_logic_notebooksPoolName $(notebookPool) -transformation_logic_unit_tests_notebooksPoolName $(notebookPool) -transformation_runner_notebooksPoolName $(notebookPool) -unit_test_runner_notebooksPoolName $(notebookPool) -validation_engine_notebooksPoolName $(notebookPool) -validation_engine_unit_tests_notebooksPoolName $(notebookPool) -WfsSftpPrudential_properties_typeProperties_userName $(WfsSftpPrudential_properties_typeProperties_userName) -CartierTableStorage_properties_typeProperties_serviceEndpoint $(CartierTableStorage_properties_typeProperties_serviceEndpoint)
+            FailOnMissingOverrides: true
+        - task: toggle-triggers-dev@2
+          displayName: 'Toggle Trigger ON'
+          inputs:
+            azureSubscription: '1ES-WFSSynapse-SvcConnection'
+            ResourceGroupName: 'RG-Cartier-Prod'
+            WorkspaceName: 'synw-time-cartier-prod'
+            ToggleOn: true
+            Triggers: '*'
+        - task: AzurePowerShell@5
+          displayName: Update Pool cartierpool dependencies
+          inputs:
+            azureSubscription: '1ES-WFSSynapse-SvcConnection'
+            ScriptType: 'InlineScript'
+            Inline: |
+              $pool = Get-AzSynapseSparkPool -WorkspaceName synw-time-cartier-prod -Name cartierpoolv34
+              $pool | Update-AzSynapseSparkPool -LibraryRequirementsFilePath $(Pipeline.Workspace)/drop/requirements.txt
+            azurePowerShellVersion: 'LatestVersion'

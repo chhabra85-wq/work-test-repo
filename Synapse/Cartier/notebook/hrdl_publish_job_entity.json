@@ -1,0 +1,132 @@
+{
+	"name": "hrdl_publish_job_entity",
+	"properties": {
+		"folder": {
+			"name": "models/table_entities"
+		},
+		"nbformat": 4,
+		"nbformat_minor": 2,
+		"bigDataPool": {
+			"referenceName": "devpoolv34",
+			"type": "BigDataPoolReference"
+		},
+		"sessionProperties": {
+			"driverMemory": "112g",
+			"driverCores": 16,
+			"executorMemory": "112g",
+			"executorCores": 16,
+			"numExecutors": 2,
+			"conf": {
+				"spark.dynamicAllocation.enabled": "false",
+				"spark.dynamicAllocation.minExecutors": "2",
+				"spark.dynamicAllocation.maxExecutors": "2",
+				"spark.autotune.trackingId": "7867567a-3b52-46a4-92fc-b81d8b43efa3"
+			}
+		},
+		"metadata": {
+			"saveOutput": true,
+			"enableDebugMode": true,
+			"kernelspec": {
+				"name": "synapse_pyspark",
+				"display_name": "Synapse PySpark"
+			},
+			"language_info": {
+				"name": "python"
+			},
+			"a365ComputeOptions": {
+				"id": "/subscriptions/f8a339ea-4445-4d69-a4bb-b7c77c9db241/resourceGroups/RG-Cartier-Dev/providers/Microsoft.Synapse/workspaces/synw-time-cartier-dev/bigDataPools/devpool",
+				"name": "devpoolv34",
+				"type": "Spark",
+				"endpoint": "https://synw-time-cartier-dev.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/devpool",
+				"auth": {
+					"type": "AAD",
+					"authResource": "https://dev.azuresynapse.net"
+				},
+				"sparkVersion": "3.3",
+				"nodeCount": 10,
+				"cores": 16,
+				"memory": 112,
+				"automaticScaleJobs": false
+			},
+			"sessionKeepAliveTimeout": 30
+		},
+		"cells": [
+			{
+				"cell_type": "code",
+				"source": [
+					"class HrdlPublishJobEntity():\r\n",
+					"    \"\"\"Class model for the ApiMetaDataEntity table\"\"\"\r\n",
+					"    def __init__(\r\n",
+					"            self, \r\n",
+					"            partition_key,\r\n",
+					"            row_key,\r\n",
+					"            is_published, \r\n",
+					"            latest_source_data_path,\r\n",
+					"            latest_handshake_path,\r\n",
+					"            destination_data_path,\r\n",
+					"            destination_handshake_path,\r\n",
+					"            last_folder_name,\r\n",
+					"            deviation_percentage,\r\n",
+					"            last_processed_record_count\r\n",
+					"        ):\r\n",
+					"        self.partition_key = partition_key\r\n",
+					"        self.row_key = row_key\r\n",
+					"        self.is_published  = is_published \r\n",
+					"        self.latest_source_data_path = latest_source_data_path\r\n",
+					"        self.latest_handshake_path = latest_handshake_path\r\n",
+					"        self.destination_data_path = destination_data_path\r\n",
+					"        self.destination_handshake_path = destination_handshake_path\r\n",
+					"        self.last_folder_name = last_folder_name\r\n",
+					"        self.deviation_percentage = deviation_percentage\r\n",
+					"        self.last_processed_record_count = last_processed_record_count\r\n",
+					"\r\n",
+					"    @classmethod\r\n",
+					"    def from_dict(cls, entity_dict):\r\n",
+					"        \"\"\"\r\n",
+					"        Takes in an api metadata dictionary and returns a constructed api metadata class\r\n",
+					"\r\n",
+					"            Parameters:\r\n",
+					"            data (Dict): dictionary containing class values as key value paris\r\n",
+					"\r\n",
+					"            Returns:\r\n",
+					"            constructed class\r\n",
+					"        \"\"\"           \r\n",
+					"        return cls(\r\n",
+					"            partition_key = entity_dict.get('PartitionKey'),\r\n",
+					"            row_key = entity_dict.get('RowKey'),\r\n",
+					"            is_published = entity_dict.get('IsPublished'),\r\n",
+					"            latest_source_data_path = entity_dict.get('LatestSourceDataPath'),\r\n",
+					"            latest_handshake_path = entity_dict.get('LatestHandshakePath'),\r\n",
+					"            destination_data_path = entity_dict.get('DestinationDataPath'),\r\n",
+					"            destination_handshake_path = entity_dict.get('DestinationHandshakePath'),\r\n",
+					"            last_folder_name = entity_dict.get(\"LatestFolderName\"),\r\n",
+					"            deviation_percentage = entity_dict.get(\"DeviationPercentage\"),\r\n",
+					"            last_processed_record_count = entity_dict.get(\"LastProcessedRecordCount\")\r\n",
+					"        )\r\n",
+					"\r\n",
+					"    def to_dict(self):\r\n",
+					"        \"\"\"\r\n",
+					"        Converts api metadata class to a dictionary\r\n",
+					"        Create & Update Table operations only accept a dictionary\r\n",
+					"\r\n",
+					"            Returns:\r\n",
+					"            dictionary with class values\r\n",
+					"        \"\"\"    \r\n",
+					"        return {\r\n",
+					"            \"PartitionKey\": self.partition_key,\r\n",
+					"            \"RowKey\": self.row_key,\r\n",
+					"            \"IsPublished\": self.is_published,\r\n",
+					"            \"LatestSourceDataPath\": self.latest_source_data_path,\r\n",
+					"            \"LatestHandshakePath\": self.latest_handshake_path,\r\n",
+					"            \"DestinationDataPath\": self.destination_data_path,\r\n",
+					"            \"DestinationHandshakePath\": self.destination_handshake_path,\r\n",
+					"            \"LatestFolderName\": self.last_folder_name,\r\n",
+					"            \"DeviationPercentage\": self.deviation_percentage,\r\n",
+					"            \"LastProcessedRecordCount\": self.last_processed_record_count\r\n",
+					"        }        "
+				],
+				"execution_count": 2
+			}
+		]
+	}
+}

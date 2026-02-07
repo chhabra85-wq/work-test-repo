@@ -1,0 +1,57 @@
+{
+	"name": "LOA_BCP_Prudential_DataFlow_Parent",
+	"properties": {
+		"activities": [
+			{
+				"name": "Execute LOA_BCP_Prudential_DataFlow_Child",
+				"type": "ExecutePipeline",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "LOA_BCP_Prudential_DataFlow_Child",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "ICMConnectorFunction",
+				"description": "Call ICM Function in case of failue.",
+				"type": "AzureFunctionActivity",
+				"dependsOn": [
+					{
+						"activity": "Execute LOA_BCP_Prudential_DataFlow_Child",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"functionName": "icmConnector",
+					"method": "POST",
+					"body": {
+						"value": "{\n   \"Title\":\"Synapse Analytics pipeline failure: @{pipeline().Pipeline} in @{pipeline().DataFactory} failed\",\n   \"DescriptionText\":\"<br><u><b><h3>@{pipeline().Pipeline} in @{pipeline().DataFactory} identified a failure.</h3></b></u><b>Current pipeline Run ID: </b>@{pipeline().RunId}<br><br><b>Pipeline error: </b>@{replace(replace(activity('Execute LOA_BCP_Prudential_DataFlow_Child').Error.message,'\\','\\\\'),'\"','\\\"')}<br><br><b>Failed child pipeline: </b>@{activity('Execute LOA_BCP_Prudential_DataFlow_Child').output.pipelineName}'s run ID @{activity('Execute LOA_BCP_Prudential_DataFlow_Child').output.pipelineRunId}<br><b>About this pipeline: </b>This pipeline is scheduled to run every hour. It fetches the LOA files that WFS would have exported, processes them, and send data to Bnefits Common Platform (BCP) to send further to Prudential. <br><br><b>Impact of this failure: </b>WFS LOA data would not be sent to prudential in timely manner. Please troubleshoot the issue, and take action accordingly to mitigate the issue.<br><br><b>What to verify?</b>:<li> Step 1: Look up the failed pipeline's runID @{activity('Execute LOA_BCP_Prudential_DataFlow_Child').output.pipelineRunId} on Synapse Analytics --> Monitor --> Pipeline Runs. <li>Step 2: Click on that failed instance and drill into the pipeline execution steps until you find the failed task. <li> Step 3: Click on the failed task to look up the reason for failure.<br>\",\n   \"Severity\":\"4\"\n}",
+						"type": "Expression"
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "ICMConnector",
+					"type": "LinkedServiceReference"
+				}
+			}
+		],
+		"folder": {
+			"name": "WFS-BCP-Prudential"
+		},
+		"annotations": []
+	}
+}

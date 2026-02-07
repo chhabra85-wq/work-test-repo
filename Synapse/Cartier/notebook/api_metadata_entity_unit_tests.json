@@ -1,0 +1,204 @@
+{
+	"name": "api_metadata_entity_unit_tests",
+	"properties": {
+		"folder": {
+			"name": "tests/test_notebooks"
+		},
+		"nbformat": 4,
+		"nbformat_minor": 2,
+		"bigDataPool": {
+			"referenceName": "devpoolv34",
+			"type": "BigDataPoolReference"
+		},
+		"sessionProperties": {
+			"driverMemory": "112g",
+			"driverCores": 16,
+			"executorMemory": "112g",
+			"executorCores": 16,
+			"numExecutors": 2,
+			"conf": {
+				"spark.dynamicAllocation.enabled": "false",
+				"spark.dynamicAllocation.minExecutors": "2",
+				"spark.dynamicAllocation.maxExecutors": "2",
+				"spark.autotune.trackingId": "63c993e8-2b97-495a-89ba-525f3bb90cb3"
+			}
+		},
+		"metadata": {
+			"saveOutput": true,
+			"enableDebugMode": true,
+			"kernelspec": {
+				"name": "synapse_pyspark",
+				"display_name": "Synapse PySpark"
+			},
+			"language_info": {
+				"name": "python"
+			},
+			"a365ComputeOptions": {
+				"id": "/subscriptions/f8a339ea-4445-4d69-a4bb-b7c77c9db241/resourceGroups/RG-Cartier-Dev/providers/Microsoft.Synapse/workspaces/synw-time-cartier-dev/bigDataPools/devpool",
+				"name": "devpoolv34",
+				"type": "Spark",
+				"endpoint": "https://synw-time-cartier-dev.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/devpool",
+				"auth": {
+					"type": "AAD",
+					"authResource": "https://dev.azuresynapse.net"
+				},
+				"sparkVersion": "3.3",
+				"nodeCount": 10,
+				"cores": 16,
+				"memory": 112,
+				"automaticScaleJobs": false
+			},
+			"sessionKeepAliveTimeout": 30
+		},
+		"cells": [
+			{
+				"cell_type": "code",
+				"source": [
+					"%run models/table_entities/api_metadata_entity"
+				],
+				"execution_count": 94
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"class TestApiMetaDataEntityUnit(unittest.TestCase):\r\n",
+					"    \"\"\"Unit test class for the ApiMetaDataEntity table\"\"\"\r\n",
+					"\r\n",
+					"    def test_api_metadata_entity_from_dict(self):\r\n",
+					"        \"\"\"\r\n",
+					"        Asserts ApiMetaDataEntity.from_dict values are constructed correctly\r\n",
+					"        \"\"\"   \r\n",
+					"\r\n",
+					"        # Arrange\r\n",
+					"        expected_partition_key = \"bankPartitionKey\"\r\n",
+					"        expected_row_key = \"bankRowKey\"\r\n",
+					"        expected_bronze_latest_path = \"bankPath\"\r\n",
+					"        expected_enabled = \"true\"\r\n",
+					"        expected_index = 10000\r\n",
+					"        expected_method = \"GET\"\r\n",
+					"        expected_next_cursor = \"nextCursor\"\r\n",
+					"        expected_record_count_to_request = 5000\r\n",
+					"        expected_silver_latest_delta_path = \"silverDeltaPath\"\r\n",
+					"        expected_silver_latest_full_path = \"silverFullPath\"\r\n",
+					"        expected_version = \"v1\"\r\n",
+					"\r\n",
+					"        mock_table_response = {\r\n",
+					"            'PartitionKey': 'bankPartitionKey',\r\n",
+					"            'RowKey': 'bankRowKey',\r\n",
+					"            'BronzeLatestPath': 'bankPath',\r\n",
+					"            'Enabled': 'true',\r\n",
+					"            'Index': 10000,\r\n",
+					"            'Method': 'GET',\r\n",
+					"            'NextCursor': 'nextCursor',\r\n",
+					"            'RecordCountToRequest': 5000,\r\n",
+					"            'SilverLatestDeltaPath': 'silverDeltaPath',\r\n",
+					"            'SilverLatestFullPath': 'silverFullPath',\r\n",
+					"            'Version': 'v1'\r\n",
+					"        }\r\n",
+					"\r\n",
+					"        # Act\r\n",
+					"        api_metadata_entity = ApiMetaDataEntity.from_dict(mock_table_response)\r\n",
+					"\r\n",
+					"        partition_key_result = api_metadata_entity.partition_key\r\n",
+					"        row_key_result = api_metadata_entity.row_key\r\n",
+					"        bronze_latest_path_result = api_metadata_entity.bronze_latest_path\r\n",
+					"        enabled_result = api_metadata_entity.enabled\r\n",
+					"        index_result = api_metadata_entity.index\r\n",
+					"        method_result = api_metadata_entity.method\r\n",
+					"        next_cursor_result = api_metadata_entity.next_cursor\r\n",
+					"        record_count_to_request_result = api_metadata_entity.record_count_to_request\r\n",
+					"        silver_latest_delta_path_result = api_metadata_entity.silver_latest_delta_path\r\n",
+					"        silver_latest_full_path_result = api_metadata_entity.silver_latest_full_path\r\n",
+					"        version_result = api_metadata_entity.version\r\n",
+					"\r\n",
+					"        # Assert\r\n",
+					"        assert partition_key_result == expected_partition_key, f\"Expected {expected_partition_key} partition key, but got {partition_key_result}\"\r\n",
+					"        assert row_key_result == expected_row_key, f\"Expected {expected_row_key} row key, but got {row_key_result}\"\r\n",
+					"        assert bronze_latest_path_result == expected_bronze_latest_path, f\"Expected {expected_bronze_latest_path} bronze latest path, but got {bronze_latest_path_result}\"\r\n",
+					"        assert enabled_result == expected_enabled, f\"Expected {expected_enabled} enabled, but got {enabled_result}\"\r\n",
+					"        assert index_result == expected_index, f\"Expected {expected_index} index, but got {index_result}\"\r\n",
+					"        assert method_result == expected_method, f\"Expected {expected_method} method, but got {method_result}\"\r\n",
+					"        assert next_cursor_result == expected_next_cursor, f\"Expected {expected_next_cursor} next cursor, but got {next_cursor_result}\"\r\n",
+					"        assert record_count_to_request_result == expected_record_count_to_request, f\"Expected {expected_record_count_to_request} record count to request, but got {record_count_to_request_result}\"\r\n",
+					"        assert silver_latest_delta_path_result == expected_silver_latest_delta_path, f\"Expected {expected_silver_latest_delta_path} silver latest delta path, but got {silver_latest_delta_path_result}\"\r\n",
+					"        assert silver_latest_full_path_result == expected_silver_latest_full_path, f\"Expected {expected_silver_latest_full_path} silver latest full path, but got {silver_latest_full_path_result}\"\r\n",
+					"        assert version_result == expected_version, f\"Expected {expected_version} version, but got {version_result}\"\r\n",
+					"\r\n",
+					"    def test_api_metadata_entity_to_dict(self):\r\n",
+					"        \"\"\"\r\n",
+					"        Asserts ApiMetaDataEntity.to_dict values are constructed correctly\r\n",
+					"        \"\"\"   \r\n",
+					"\r\n",
+					"        # Arrange\r\n",
+					"        expected_partition_key = \"bankPartitionKey\"\r\n",
+					"        expected_row_key = \"bankRowKey\"\r\n",
+					"        expected_bronze_latest_path = \"bankPath\"\r\n",
+					"        expected_enabled = \"true\"\r\n",
+					"        expected_index = 10000\r\n",
+					"        expected_method = \"GET\"\r\n",
+					"        expected_next_cursor = \"nextCursor\"\r\n",
+					"        expected_record_count_to_request = 5000\r\n",
+					"        expected_silver_latest_delta_path = \"silverDeltaPath\"\r\n",
+					"        expected_silver_latest_full_path = \"silverFullPath\"\r\n",
+					"        expected_version = \"v1\"\r\n",
+					"\r\n",
+					"        mock_table_response = {\r\n",
+					"            'PartitionKey': 'bankPartitionKey',\r\n",
+					"            'RowKey': 'bankRowKey',\r\n",
+					"            'BronzeLatestPath': 'bankPath',\r\n",
+					"            'Enabled': 'true',\r\n",
+					"            'Index': 10000,\r\n",
+					"            'Method': 'GET',\r\n",
+					"            'NextCursor': 'nextCursor',\r\n",
+					"            'RecordCountToRequest': 5000,\r\n",
+					"            'SilverLatestDeltaPath': 'silverDeltaPath',\r\n",
+					"            'SilverLatestFullPath': 'silverFullPath',\r\n",
+					"            'Version': 'v1'\r\n",
+					"        }\r\n",
+					"\r\n",
+					"        # Act\r\n",
+					"        api_metadata_entity = ApiMetaDataEntity.from_dict(mock_table_response)\r\n",
+					"        api_metadata_entity_dictionary = api_metadata_entity.to_dict()\r\n",
+					"\r\n",
+					"        partition_key_result = api_metadata_entity_dictionary[\"PartitionKey\"]\r\n",
+					"        row_key_result = api_metadata_entity_dictionary[\"RowKey\"]\r\n",
+					"        bronze_latest_path_result = api_metadata_entity_dictionary[\"BronzeLatestPath\"]\r\n",
+					"        enabled_result = api_metadata_entity_dictionary[\"Enabled\"]\r\n",
+					"        index_result = api_metadata_entity_dictionary[\"Index\"]\r\n",
+					"        method_result = api_metadata_entity_dictionary[\"Method\"]\r\n",
+					"        next_cursor_result = api_metadata_entity_dictionary[\"NextCursor\"]\r\n",
+					"        record_count_to_request_result = api_metadata_entity_dictionary[\"RecordCountToRequest\"]\r\n",
+					"        silver_latest_delta_path_result = api_metadata_entity_dictionary[\"SilverLatestDeltaPath\"]\r\n",
+					"        silver_latest_full_path_result = api_metadata_entity_dictionary[\"SilverLatestFullPath\"]\r\n",
+					"        version_result = api_metadata_entity_dictionary[\"Version\"]\r\n",
+					"\r\n",
+					"        # Assert\r\n",
+					"        assert partition_key_result == expected_partition_key, f\"Expected {expected_partition_key} partition key, but got {partition_key_result}\"\r\n",
+					"        assert row_key_result == expected_row_key, f\"Expected {expected_row_key} row key, but got {row_key_result}\"\r\n",
+					"        assert bronze_latest_path_result == expected_bronze_latest_path, f\"Expected {expected_bronze_latest_path} bronze latest path, but got {bronze_latest_path_result}\"\r\n",
+					"        assert enabled_result == expected_enabled, f\"Expected {expected_enabled} enabled, but got {enabled_result}\"\r\n",
+					"        assert index_result == expected_index, f\"Expected {expected_index} index, but got {index_result}\"\r\n",
+					"        assert method_result == expected_method, f\"Expected {expected_method} method, but got {method_result}\"\r\n",
+					"        assert next_cursor_result == expected_next_cursor, f\"Expected {expected_next_cursor} next cursor, but got {next_cursor_result}\"\r\n",
+					"        assert record_count_to_request_result == expected_record_count_to_request, f\"Expected {expected_record_count_to_request} record count to request, but got {record_count_to_request_result}\"\r\n",
+					"        assert silver_latest_delta_path_result == expected_silver_latest_delta_path, f\"Expected {expected_silver_latest_delta_path} silver latest delta path, but got {silver_latest_delta_path_result}\"\r\n",
+					"        assert silver_latest_full_path_result == expected_silver_latest_full_path, f\"Expected {expected_silver_latest_full_path} silver latest full path, but got {silver_latest_full_path_result}\"\r\n",
+					"        assert version_result == expected_version, f\"Expected {expected_version} version, but got {version_result}\"\r\n",
+					""
+				],
+				"execution_count": 95
+			}
+		]
+	}
+}
