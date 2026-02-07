@@ -1,0 +1,8 @@
+schemaVersion: 0.0.1
+isProduction: true
+accountableOwners:
+  service: 76857d1e-f07d-4dab-8998-7dbfad0552ba
+routing:
+  defaultAreaPath:
+    org: microsoftit
+    path: OneITVSO\Human Resources\Time Management\Workforce Software Integration

@@ -1,0 +1,101 @@
+# Starter pipeline
+
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+ branches:
+  include:
+    - main
+    - develop
+    - features/cartier-synapse-collab
+
+ paths:
+  include:
+    - Synapse/Cartier/*
+
+pool:
+  vmImage: windows-latest
+
+steps:
+  - task: CredScan@3
+    inputs:
+      debugMode: false
+    condition: succeededOrFailed()
+    displayName: 'Run Credential Scanner'
+
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '3.10'
+      addToPath: true
+
+  - task: PipAuthenticate@1
+    inputs:
+      artifactFeeds: 'OneITVSO/HR-TIME-TimeLeaveShiftSchedCartier'
+
+  - script: pip install -r requirements.txt
+    workingDirectory: '$(System.DefaultWorkingDirectory)\InfraDeployment'
+    displayName: 'Install dependencies from requirements.txt'
+    
+  - task: PowerShell@2
+    displayName: 'Convert Notebook to Python'
+    inputs:
+      targetType: 'filePath'
+      filePath: '$(System.DefaultWorkingDirectory)\InfraDeployment\scripts\ConvertNotebookJsonToPython.ps1'
+      arguments: '-SourceFile "$(System.DefaultWorkingDirectory)\Synapse\Cartier\notebook\unit_test_runner.json" -DestinationFile "$(System.DefaultWorkingDirectory)\Synapse\Cartier\unit_test_runner.py"'
+    
+  - task: PowerShell@2
+    displayName: 'Run Unit Test with Coverage'
+    inputs:
+      targetType: 'inline'
+      script: |
+        cd "$(System.DefaultWorkingDirectory)\Synapse\Cartier"
+        coverage run unit_test_runner.py
+        coverage report
+        coverage xml
+
+  - task: PublishCodeCoverageResults@1
+    inputs:
+      codeCoverageTool: 'Cobertura'
+      summaryFileLocation: '$(System.DefaultWorkingDirectory)\**\coverage.xml'
+
+  - task: PowerShell@2
+    displayName: 'Verify Code Coverage'
+    inputs:
+      targetType: 'inline'
+      script: |
+        [xml]$coverageData = Get-Content $(System.DefaultWorkingDirectory)\Synapse\Cartier\coverage.xml
+              $lineRate = [double]$coverageData.coverage.'line-rate'
+              $threshold = 0.70
+              if ($lineRate -lt $threshold) {
+                  Write-Error "Code coverage ($([math]::Round($lineRate*100,2))%) is below the threshold ($([math]::Round($threshold*100,2))%)"
+                  exit 1
+              } else {
+                  Write-Output "Code coverage ($([math]::Round($lineRate*100,2))%) is above the threshold"
+              }
+
+  - task: Synapse workspace deployment@2
+    inputs:
+      operation: 'validate'
+      ArtifactsFolder: '$(System.DefaultWorkingDirectory)/Synapse/Cartier'
+      azureSubscription: 'MSFT - Workforce Software Integrations -ServiceConnection'
+      ResourceGroupName: 'RG-Cartier-Dev'
+      TargetWorkspaceName: 'synw-time-cartier-dev'
+      DeleteArtifactsNotInTemplate: false
+      DeployManagedPrivateEndpoints: false
+      FailOnMissingOverrides: false
+      Environment: 'prod'
+      npmpackage: 'prod'
+
+  - task: CopyFiles@2
+    inputs:
+      SourceFolder: '$(System.DefaultWorkingDirectory)/InfraDeployment/'
+      Contents: '*requirements.txt'
+      TargetFolder: '$(Build.ArtifactStagingDirectory)/drop'
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+      ArtifactName: 'drop'
+      publishLocation: 'Container'
